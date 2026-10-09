@@ -8,7 +8,7 @@
     "start": "next start -p 4178 -H 0.0.0.0",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/deck.test.ts",
+    "test": "tsx --test lib/deck.test.ts lib/gemini.test.ts",
     "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
