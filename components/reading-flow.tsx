@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
+import { ContextForm } from "@/components/context-form";
 import { CardBack, FlipCard, TarotFace } from "@/components/tarot-card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +11,7 @@ import { errorText, useI18n } from "@/lib/i18n";
 import type { ReadingRecord } from "@/lib/reading-record";
 import { getSpread, isSpreadId, spreads, type Spread } from "@/lib/spreads";
 import { prepareDeck, type DrawnCard, type ShuffledCard } from "@/lib/shuffle";
+import { contextComplete, contextLabel, type ReadingContext } from "@/lib/reading-context";
 import { buildReading, buildSummary } from "@/lib/summary";
 import { cn } from "cn";
 import Link from "next/link";
@@ -46,6 +48,8 @@ export function ReadingFlow() {
   const [aiState, setAiState] = useState<"idle" | "loading" | "error">("idle");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [activePosition, setActivePosition] = useState<string | null>(null);
+  const [context, setContext] = useState<ReadingContext>({});
+  const [landedSlot, setLandedSlot] = useState<number | null>(null);
 
   const spread = getSpread(spreadId) ?? spreads[1]!;
   const nextPosition = spread.positions[placements.length];
@@ -97,7 +101,9 @@ export function ReadingFlow() {
   }
 
   function beginShuffle() {
+    if (!contextComplete(spreadId, context)) return;
     resetReading();
+    setLandedSlot(null);
     setPhase("shuffle");
   }
 
@@ -117,6 +123,7 @@ export function ReadingFlow() {
       { positionId: position.id, cardId: card.cardId, reversed: card.reversed, revealed: false },
     ];
     setPlacements(next);
+    setLandedSlot(next.length - 1);
     setDeck((current) => current.filter((item) => item.cardId !== cardId));
     if (next.length === spread.positions.length) setPhase("reveal");
   }
@@ -133,12 +140,13 @@ export function ReadingFlow() {
 
   async function save() {
     setSaveState("saving");
-    const summary = buildSummary({ question, spreadId: spread.id, drawn, locale });
+    const summary = buildSummary({ question, spreadId: spread.id, drawn, locale, context });
     const payload = {
       question,
       spreadId: spread.id,
       locale,
       cards: drawn,
+      context,
       aiInterpretation: aiText,
     };
     try {
@@ -167,6 +175,7 @@ export function ReadingFlow() {
         locale,
         cards: drawn,
         summary,
+        context,
         aiInterpretation: aiText,
       };
       upsertGuestReading(reading);
@@ -185,7 +194,7 @@ export function ReadingFlow() {
       const response = await fetch("/api/interpret", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, spreadId: spread.id, locale, cards: drawn }),
+        body: JSON.stringify({ question, spreadId: spread.id, locale, cards: drawn, context }),
       });
       const data = (await response.json()) as { interpretation?: string; error?: string };
       if (!response.ok || !data.interpretation) {
@@ -240,7 +249,7 @@ export function ReadingFlow() {
       </ol>
 
       {phase === "ask" ? (
-        <section className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <section className="ritual-step mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div>
             <label htmlFor="question" className="text-sm text-primary">
               {t.questionLabel}
@@ -262,7 +271,10 @@ export function ReadingFlow() {
                   type="button"
                   data-testid={`spread-${item.id}`}
                   aria-pressed={item.id === spreadId}
-                  onClick={() => setSpreadId(item.id)}
+                  onClick={() => {
+                    setSpreadId(item.id);
+                    setContext({});
+                  }}
                   className={cn(
                     "rounded-2xl border p-4 text-left transition",
                     item.id === spreadId
@@ -280,9 +292,18 @@ export function ReadingFlow() {
                 </button>
               ))}
             </div>
-            <Button className="mt-6 h-11 px-6" onClick={beginShuffle} data-testid="shuffle-button">
+            <ContextForm spreadId={spreadId} context={context} onChange={setContext} />
+            <Button
+              className="mt-6 h-11 px-6"
+              onClick={beginShuffle}
+              disabled={!contextComplete(spreadId, context)}
+              data-testid="shuffle-button"
+            >
               {t.shuffle}
             </Button>
+            {contextComplete(spreadId, context) ? null : (
+              <p className="mt-2 text-sm text-muted-foreground">{t.contextNeeded}</p>
+            )}
           </div>
           <aside className="rounded-3xl border border-primary/30 bg-card/60 p-5">
             <p className="text-sm leading-7 text-foreground/85">{t.shuffleNote}</p>
@@ -292,7 +313,7 @@ export function ReadingFlow() {
       ) : null}
 
       {phase === "shuffle" ? (
-        <section className="mt-10 flex flex-col items-center" data-testid="shuffle-stage">
+        <section className="ritual-step mt-10 flex flex-col items-center" data-testid="shuffle-stage">
           <p className="focus-note" data-testid="focus-note">{t.focusNote}</p>
           {question.trim() ? null : <p className="mt-4 max-w-xl text-center leading-7 text-muted-foreground">{t.focusNoteBlank}</p>}
           <p className="mt-4 max-w-xl text-center text-sm leading-7 text-muted-foreground">{t.focusReady}</p>
@@ -314,7 +335,7 @@ export function ReadingFlow() {
       ) : null}
 
       {phase === "pick" ? (
-        <section id="pick-stage" className="pick-stage mt-4" data-testid="pick-stage">
+        <section id="pick-stage" className="ritual-step pick-stage mt-4" data-testid="pick-stage">
           {question ? <p className="line-clamp-1 text-sm leading-6 text-foreground/90">「{question}」</p> : null}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <p className="min-w-0 flex-1 text-base leading-7 text-primary sm:text-lg" data-testid="pick-prompt" aria-live="polite">
@@ -334,6 +355,7 @@ export function ReadingFlow() {
                 <li
                   key={position.id}
                   data-state={state}
+                  data-landed={landedSlot === index ? "true" : undefined}
                   aria-current={state === "current" ? "step" : undefined}
                 >
                   <span className="pick-mini" aria-hidden>
@@ -365,7 +387,7 @@ export function ReadingFlow() {
       ) : null}
 
       {phase === "reveal" ? (
-        <section id="reveal-stage" className="reveal-stage mt-4" data-testid="reveal-stage">
+        <section id="reveal-stage" className="ritual-step reveal-stage mt-4" data-testid="reveal-stage">
           {question ? <p className="line-clamp-2 max-w-3xl text-base leading-7">「{question}」</p> : null}
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
             <p className="text-sm text-muted-foreground">
@@ -401,6 +423,7 @@ export function ReadingFlow() {
                   drawn={drawn}
                   locale={locale}
                   question={question}
+                  context={context}
                   aiText={aiText}
                   aiAvailable={aiAvailable}
                   aiState={aiState}
@@ -494,6 +517,7 @@ export function ReadingPanels({
   drawn,
   locale,
   question,
+  context = null,
   aiText,
   aiAvailable,
   aiState,
@@ -508,6 +532,7 @@ export function ReadingPanels({
   drawn: DrawnCard[];
   locale: Locale;
   question: string;
+  context?: ReadingContext | null;
   aiText: string | null;
   aiAvailable: boolean;
   aiState: "idle" | "loading" | "error";
@@ -519,12 +544,18 @@ export function ReadingPanels({
   activePosition?: string | null;
 }) {
   const { t } = useI18n();
-  const reading = buildReading({ question, spreadId: spread.id, drawn, locale });
+  const reading = buildReading({ question, spreadId: spread.id, drawn, locale, context });
+  const situation = contextLabel(spread.id, context, locale);
 
   return (
     <div className={cn("grid gap-6", savedMode ? "mt-10" : "mt-6 lg:mt-0")}>
       <article className="rounded-3xl border border-primary/35 bg-card/70 p-5 sm:p-7" data-testid="reading-summary">
         <h2 className="font-display text-2xl text-primary">{t.summaryTitle}</h2>
+        {situation ? (
+          <p className="mt-3 text-sm text-primary" data-testid="reading-context">
+            {situation}
+          </p>
+        ) : null}
         <div className="mt-4 space-y-6">
           {reading.synthesis.map((block) => (
             <section key={block.id}>
@@ -634,6 +665,7 @@ export function SavedReading({ reading }: { reading: ReadingRecord }) {
           spreadId: reading.spreadId,
           locale,
           cards: reading.cards,
+          context: reading.context,
         }),
       });
       const data = (await response.json()) as { interpretation?: string; error?: string };
@@ -665,6 +697,9 @@ export function SavedReading({ reading }: { reading: ReadingRecord }) {
       </Link>
       <h1 className="mt-3 text-3xl text-primary">{spread.name[locale]}</h1>
       {reading.question ? <p className="mt-3 text-lg leading-8">「{reading.question}」</p> : <p className="mt-3 text-muted-foreground">{t.noQuestion}</p>}
+      {contextLabel(reading.spreadId, reading.context, locale) ? (
+        <p className="mt-2 text-sm text-primary">{contextLabel(reading.spreadId, reading.context, locale)}</p>
+      ) : null}
       <SpreadTable
         spread={spread}
         placements={placements}
@@ -680,6 +715,7 @@ export function SavedReading({ reading }: { reading: ReadingRecord }) {
         drawn={reading.cards}
         locale={locale}
         question={reading.question}
+        context={reading.context}
         aiText={aiText}
         aiAvailable={aiAvailable}
         aiState={aiState}

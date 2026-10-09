@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getCard } from "@/lib/cards";
+import { contextLabel } from "@/lib/reading-context";
 import { deleteGuestReading, loadGuestReadings, saveGuestReadings } from "@/lib/guest-history";
 import { useI18n } from "@/lib/i18n";
 import type { ReadingRecord } from "@/lib/reading-record";
@@ -91,6 +92,7 @@ export function HistoryView() {
           spreadId: reading.spreadId,
           locale: reading.locale,
           cards: reading.cards,
+          context: reading.context,
           aiInterpretation: reading.aiInterpretation,
         }),
       });
@@ -154,6 +156,9 @@ export function HistoryView() {
                   <Link href={`/history/${reading.id}`} className="min-w-0 flex-1">
                     <p className="text-xs tracking-[0.18em] text-primary">{spread?.name[locale] ?? reading.spreadId}</p>
                     <p className="mt-1 truncate text-base">{reading.question || t.noQuestion}</p>
+                    {contextLabel(reading.spreadId, reading.context, locale) ? (
+                      <p className="mt-1 text-xs text-primary">{contextLabel(reading.spreadId, reading.context, locale)}</p>
+                    ) : null}
                     <p className="mt-1 text-xs text-muted-foreground">
                       {new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
                         dateStyle: "medium",

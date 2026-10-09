@@ -33,13 +33,21 @@ export function ThemeToggle() {
 
   function toggle() {
     const next = document.documentElement.classList.contains("dark") ? "light" : "dark";
-    applyTheme(next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      /* private mode can block storage; the class still switches for this visit */
+    const apply = () => {
+      applyTheme(next);
+      try {
+        localStorage.setItem(THEME_KEY, next);
+      } catch {
+        /* private mode can block storage; the class still switches for this visit */
+      }
+      window.dispatchEvent(new Event("daodao-theme"));
+    };
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduce && typeof document.startViewTransition === "function") {
+      document.startViewTransition(apply);
+      return;
     }
-    window.dispatchEvent(new Event("daodao-theme"));
+    apply();
   }
 
   return (

@@ -1,4 +1,5 @@
 import { requireCard, type Card, type Locale, type TopicKey } from "./cards";
+import { contextClosing, contextPositionLead, contextTopic, type ReadingContext } from "./reading-context";
 import { getSpread, type Spread, type SpreadPosition } from "./spreads";
 import type { DrawnCard } from "./shuffle";
 
@@ -70,15 +71,17 @@ export function spreadTopic(spreadId: string): Exclude<TopicKey, "general" | "ad
   return "resources";
 }
 
-function lensHeading(spreadId: string, locale: Locale): string {
+function lensHeading(spreadId: string, locale: Locale, topic: Exclude<TopicKey, "advice">): string {
   if (locale === "zh") {
-    if (spreadId === "love") return "在这段关系里";
-    if (spreadId === "career") return "在事业里";
+    if (topic === "love") return spreadId === "love" ? "在这段关系里" : "在感情里";
+    if (topic === "career") return spreadId === "career" ? "在事业里" : "在事业学业里";
+    if (topic === "general") return "落到这件事上";
     if (spreadId === "single") return "身心与今日的成长";
     return "落到生活里";
   }
-  if (spreadId === "love") return "In this relationship";
-  if (spreadId === "career") return "In the work";
+  if (topic === "love") return spreadId === "love" ? "In this relationship" : "In love";
+  if (topic === "career") return spreadId === "career" ? "In the work" : "In work or study";
+  if (topic === "general") return "On this matter";
   if (spreadId === "single") return "Body, money, and today's growth";
   return "In ordinary life";
 }
@@ -196,17 +199,19 @@ const positionFrame: Record<string, Record<string, { zh: string; en: string }>> 
   },
 };
 
-export function positionMeaning(line: ReadingLine, locale: Locale, spreadId = ""): string {
+export function positionMeaning(line: ReadingLine, locale: Locale, spreadId = "", context?: ReadingContext | null): string {
   const orient = orientation(line.reversed, locale);
   const name = line.card.name[locale];
   const sense = meaning(line.card, line.reversed, locale);
   const frame = positionFrame[spreadId]?.[line.position.id];
+  const situation = contextPositionLead(spreadId, context, locale);
   if (locale === "zh") {
     const lead = frame?.zh ?? `在「${line.position.name.zh}」这个位置，`;
-    return `${lead}${line.position.description.zh} ${orient}的${name}在这里的读法是：${sense}`;
+    return `${situation}${lead}${line.position.description.zh} ${orient}的${name}在这里的读法是：${sense}`;
   }
   const lead = frame?.en ?? `In ${line.position.name.en},`;
-  return `${lead} ${line.position.description.en} ${name}, ${orient}, reads here as: ${sense}`;
+  const prefix = situation ? `${situation} ` : "";
+  return `${prefix}${lead} ${line.position.description.en} ${name}, ${orient}, reads here as: ${sense}`;
 }
 
 function coreBlock(line: ReadingLine, locale: Locale): string {
@@ -233,9 +238,9 @@ function adviceBlock(line: ReadingLine, locale: Locale): string {
   return line.card.topics[orient].advice[locale];
 }
 
-function lensBlock(line: ReadingLine, spreadId: string, locale: Locale): string {
+function lensBlock(line: ReadingLine, spreadId: string, locale: Locale, context?: ReadingContext | null): string {
   const orient = line.reversed ? "reversed" : "upright";
-  const key = spreadTopic(spreadId);
+  const key = contextTopic(spreadId, context);
   return line.card.topics[orient][key][locale];
 }
 
@@ -422,7 +427,7 @@ function storyBlock(spread: Spread, lines: ReadingLine[], locale: Locale): strin
     : `The center of the Celtic Cross is ${label("present")}, crossed by ${label("challenge")}, standing on ${label("foundation")}. The recent past (${label("past")}) still holds the sleeve. The aim in mind is ${label("crown")}, and if you do not turn, the near future moves toward ${label("future")}. Your stance is ${label("self")}, the room around you is ${label("environment")}, what you hope and fear is ${label("hopes")}, and the landing if these forces continue is ${label("outcome")}. Read the center and the cross first, then ask whether the outcome is only your hope or fear made larger.`;
 }
 
-function closingBlock(question: string, spread: Spread, lines: ReadingLine[], locale: Locale): string {
+function closingBlock(question: string, spread: Spread, lines: ReadingLine[], locale: Locale, context?: ReadingContext | null): string {
   const trimmed = question.trim();
   const advicePosition = lines.find((line) => line.position.id === "advice" || line.position.id === "counsel" || line.position.id === "guidance");
   const last = lines[lines.length - 1];
@@ -437,13 +442,15 @@ function closingBlock(question: string, spread: Spread, lines: ReadingLine[], lo
       ? `回到你放下的问题：「${trimmed}」。牌没有替你签字，它们把注意力收在「${spread.name.zh}」这条路上。`
       : `你没有写下具体问题，所以这组${spread.name.zh}更像一面举起的镜子，照的是此刻最响的主题。`;
     const next = step ? `你可以先做的一件事是：${step}` : "";
-    return [ask, next, disclaimer].filter(Boolean).join("");
+    const situation = contextClosing(spread.id, context, locale);
+    return [ask, situation, next, disclaimer].filter(Boolean).join("");
   }
   const ask = trimmed
     ? `Return to the question you set down: "${trimmed}". The cards do not sign it for you. They gather attention along the ${spread.name.en}.`
     : `You left the question blank, so this ${spread.name.en} is a mirror held up to whatever is loudest right now.`;
   const next = step ? `One thing you can do first: ${step}` : "";
-  return [ask, next, disclaimer].filter(Boolean).join(" ");
+  const situation = contextClosing(spread.id, context, locale);
+  return [ask, situation, next, disclaimer].filter(Boolean).join(" ");
 }
 
 function headings(locale: Locale) {
@@ -472,6 +479,7 @@ export function buildReading(input: {
   spreadId: string;
   drawn: DrawnCard[];
   locale: Locale;
+  context?: ReadingContext | null;
 }): BuiltReading {
   const spread = getSpread(input.spreadId);
   if (!spread) {
@@ -483,8 +491,9 @@ export function buildReading(input: {
   const synthesis: ReadingBlock[] = [
     { id: "themes", heading: title.themes, body: themeBlock(lines, locale) },
     { id: "story", heading: title.story, body: storyBlock(spread, lines, locale) },
-    { id: "closing", heading: title.closing, body: closingBlock(input.question, spread, lines, locale) },
+    { id: "closing", heading: title.closing, body: closingBlock(input.question, spread, lines, locale, input.context) },
   ];
+  const topic = contextTopic(spread.id, input.context);
   const chapters: CardChapter[] = lines.map((line) => {
     const orientLabel = orientation(line.reversed, locale);
     return {
@@ -501,8 +510,8 @@ export function buildReading(input: {
           heading: locale === "zh" ? `${orientLabel}含义` : `${orientLabel[0]?.toUpperCase()}${orientLabel.slice(1)} meaning`,
           body: orientationBlock(line, locale),
         },
-        { id: "position", heading: title.inPosition, body: positionMeaning(line, locale, spread.id) },
-        { id: "lens", heading: lensHeading(spread.id, locale), body: lensBlock(line, spread.id, locale) },
+        { id: "position", heading: title.inPosition, body: positionMeaning(line, locale, spread.id, input.context) },
+        { id: "lens", heading: lensHeading(spread.id, locale, topic), body: lensBlock(line, spread.id, locale, input.context) },
         { id: "advice", heading: title.advice, body: adviceBlock(line, locale) },
       ],
     };
@@ -527,6 +536,7 @@ export function buildSummary(input: {
   spreadId: string;
   drawn: DrawnCard[];
   locale: Locale;
+  context?: ReadingContext | null;
 }): string {
   return buildReading(input).text;
 }

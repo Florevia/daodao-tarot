@@ -1,5 +1,6 @@
 import { readSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sanitizeContext } from "@/lib/reading-context";
 import { validateDrawnCards } from "@/lib/reading-record";
 import { serializeReading } from "@/lib/serialize-reading";
 import { buildSummary } from "@/lib/summary";
@@ -16,6 +17,15 @@ const schema = z.object({
   spreadId: z.string().min(1).max(40),
   locale: z.enum(["zh", "en"]),
   cards: z.array(cardSchema).min(1).max(10),
+  context: z
+    .object({
+      status: z.string().max(40).optional(),
+      focus: z.string().max(40).optional(),
+      area: z.string().max(40).optional(),
+      mood: z.string().max(40).optional(),
+      theme: z.string().max(40).optional(),
+    })
+    .optional(),
   aiInterpretation: z.string().max(8000).nullable().optional(),
 });
 
@@ -38,11 +48,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
   const question = parsed.data.question?.trim() ?? "";
+  const context = sanitizeContext(parsed.data.spreadId, parsed.data.context);
   const summary = buildSummary({
     question,
     spreadId: parsed.data.spreadId,
     drawn: parsed.data.cards,
     locale: parsed.data.locale,
+    context,
   });
   const reading = await prisma.reading.create({
     data: {
@@ -52,6 +64,7 @@ export async function POST(request: Request) {
       locale: parsed.data.locale,
       cardsJson: JSON.stringify(parsed.data.cards),
       summary,
+      contextJson: JSON.stringify(context),
       aiInterpretation: parsed.data.aiInterpretation?.trim() || null,
     },
   });

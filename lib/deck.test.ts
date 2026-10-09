@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
 import { cards, getCard } from "./cards/index";
+import { contextComplete, sanitizeContext } from "./reading-context";
 import { validateDrawnCards } from "./reading-record";
 import { buildSummary, spreadTopic } from "./summary";
 import { createReading, mulberry32, placePickedCards, prepareDeck, shuffleDeck } from "./shuffle";
@@ -150,6 +151,41 @@ describe("shuffle and summary", () => {
     assert.match(reopened, /旧问题/);
     assert.match(reopened, /愚者/);
     assert.match(reopened, /高塔/);
+    assert.equal(contextComplete("love", {}), false);
+    assert.equal(contextComplete("single", {}), true);
+    assert.equal(contextComplete("love", { status: "partnered", focus: "direction" }), true);
+    assert.equal(sanitizeContext("love", { status: "nope", focus: "feelings" }).status, undefined);
+    const partnered = buildSummary({
+      question: "我们还好吗",
+      spreadId: "love",
+      drawn,
+      locale: "zh",
+      context: { status: "partnered", focus: "direction" },
+    });
+    assert.match(partnered, /已婚或同居/);
+    assert.match(partnered, /关系走向/);
+    assert.match(partnered, /不要把它读成「要不要开始约会」/);
+    assert.doesNotMatch(partnered, /要不要开始一段新的恋爱。你给出的情况/);
+    const seeking = buildSummary({
+      question: "",
+      spreadId: "career",
+      drawn: careerDrawn,
+      locale: "zh",
+      context: { status: "seeking", focus: "timing" },
+    });
+    assert.match(seeking, /求职中/);
+    assert.match(seeking, /不要把建议写成你已经坐在那份工作里/);
+    const loveLens = getCard("major-00")!.topics.upright.love.zh.slice(0, 18);
+    const heart = buildSummary({
+      question: "近况",
+      spreadId: "three",
+      drawn: legacy,
+      locale: "zh",
+      context: { area: "love", mood: "anxious" },
+    });
+    assert.match(heart, /在感情里/);
+    assert.match(heart, /焦虑/);
+    assert.match(heart, new RegExp(loveLens.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   });
 });
 

@@ -29,6 +29,7 @@ model Reading {
   locale           String   @default("zh")
   cardsJson        String
   summary          String
+  contextJson      String   @default("{}")
   aiInterpretation String?
   createdAt        DateTime @default(now())
 

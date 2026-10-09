@@ -1,4 +1,5 @@
 import { getCard, type Locale } from "./cards";
+import type { ReadingContext } from "./reading-context";
 import { getSpread } from "./spreads";
 import type { DrawnCard } from "./shuffle";
 
@@ -9,6 +10,7 @@ export type ReadingRecord = {
   locale: Locale;
   cards: DrawnCard[];
   summary: string;
+  context?: ReadingContext | null;
   aiInterpretation: string | null;
   createdAt: string;
 };
