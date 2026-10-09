@@ -2,11 +2,19 @@
 
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { useEffect, useState } from "react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const [theme, setTheme] = useState<"light" | "dark">("dark")
+  useEffect(() => {
+    const read = () => setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light")
+    read()
+    window.addEventListener("daodao-theme", read)
+    return () => window.removeEventListener("daodao-theme", read)
+  }, [])
   return (
     <Sonner
-      theme="dark"
+      theme={theme}
       className="toaster group"
       icons={{
         success: (

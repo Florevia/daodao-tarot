@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/theme";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "cn";
 import Link from "next/link";
@@ -59,6 +60,7 @@ export function SiteHeader() {
           })}
         </nav>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button
             type="button"
             variant="outline"

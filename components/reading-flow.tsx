@@ -45,6 +45,7 @@ export function ReadingFlow() {
   const [aiAvailable, setAiAvailable] = useState(false);
   const [aiState, setAiState] = useState<"idle" | "loading" | "error">("idle");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [activePosition, setActivePosition] = useState<string | null>(null);
 
   const spread = getSpread(spreadId) ?? spreads[1]!;
   const nextPosition = spread.positions[placements.length];
@@ -82,6 +83,17 @@ export function ReadingFlow() {
     setAiText(null);
     setAiState("idle");
     setSaveState("idle");
+    setActivePosition(null);
+  }
+
+  function focusPosition(positionId: string, revealed: boolean) {
+    if (!revealed) {
+      reveal(positionId);
+      return;
+    }
+    if (!placements.every((item) => item.revealed)) return;
+    setActivePosition(positionId);
+    document.getElementById(`pos-${positionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function beginShuffle() {
@@ -354,54 +366,56 @@ export function ReadingFlow() {
 
       {phase === "reveal" ? (
         <section id="reveal-stage" className="reveal-stage mt-4" data-testid="reveal-stage">
-          {question ? <p className="max-w-3xl text-lg leading-8">「{question}」</p> : null}
-          <p className="mt-2 text-sm text-muted-foreground">
-            {spread.name[locale]} · {spread.positions.length} {t.cardCount}
-          </p>
-          {!allRevealed ? (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <p className="text-sm text-primary">{t.flipHint}</p>
-              <Button className="h-11 px-6" onClick={revealAll} data-testid="reveal-all">
-                {t.revealAll}
-              </Button>
+          {question ? <p className="line-clamp-2 max-w-3xl text-base leading-7">「{question}」</p> : null}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p className="text-sm text-muted-foreground">
+              {spread.name[locale]} · {spread.positions.length} {t.cardCount}
+            </p>
+            {!allRevealed ? (
+              <>
+                <p className="text-sm text-primary">{t.flipHint}</p>
+                <Button className="h-11 px-6" onClick={revealAll} data-testid="reveal-all">
+                  {t.revealAll}
+                </Button>
+              </>
+            ) : null}
+          </div>
+          <div className={cn("reading-layout", allRevealed && "is-split")}>
+            <div className="reading-board">
+              <SpreadTable
+                spread={spread}
+                placements={placements}
+                locale={locale}
+                upright={t.upright}
+                reversed={t.reversed}
+                emptyLabel={t.pickWaiting}
+                faceDownLabel={t.pickedFaceDown}
+                className="spread mt-3"
+                onActivate={focusPosition}
+              />
             </div>
-          ) : null}
-          <SpreadTable
-            spread={spread}
-            placements={placements}
-            locale={locale}
-            upright={t.upright}
-            reversed={t.reversed}
-            emptyLabel={t.pickWaiting}
-            faceDownLabel={t.pickedFaceDown}
-            onActivate={(positionId, revealed) => {
-              if (!revealed) {
-                reveal(positionId);
-                return;
-              }
-              if (allRevealed) {
-                document.getElementById(`pos-${positionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }
-            }}
-          />
-          {allRevealed ? (
-            <ReadingPanels
-              spread={spread}
-              drawn={drawn}
-              locale={locale}
-              question={question}
-              aiText={aiText}
-              aiAvailable={aiAvailable}
-              aiState={aiState}
-              saveState={saveState}
-              onInterpret={() => void interpret()}
-              onSave={() => void save()}
-              onReset={() => {
-                resetReading();
-                setPhase("ask");
-              }}
-            />
-          ) : null}
+            {allRevealed ? (
+              <div className="reading-interpret" data-testid="reading-interpret">
+                <ReadingPanels
+                  spread={spread}
+                  drawn={drawn}
+                  locale={locale}
+                  question={question}
+                  aiText={aiText}
+                  aiAvailable={aiAvailable}
+                  aiState={aiState}
+                  saveState={saveState}
+                  activePosition={activePosition}
+                  onInterpret={() => void interpret()}
+                  onSave={() => void save()}
+                  onReset={() => {
+                    resetReading();
+                    setPhase("ask");
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
         </section>
       ) : null}
     </div>
@@ -418,6 +432,7 @@ export function SpreadTable({
   emptyLabel,
   faceDownLabel,
   compact = false,
+  className,
 }: {
   spread: Spread;
   placements: Placement[];
@@ -428,10 +443,11 @@ export function SpreadTable({
   emptyLabel?: string;
   faceDownLabel?: string;
   compact?: boolean;
+  className?: string;
 }) {
   return (
     <div
-      className="spread mt-6"
+      className={className ?? "spread mt-6"}
       data-layout={spread.layout}
       data-picking={compact ? "true" : undefined}
       data-testid="spread-table"
@@ -459,6 +475,7 @@ export function SpreadTable({
             <FlipCard
               revealed={revealed}
               label={label}
+              kicker={position.name[locale]}
               name={revealed ? card.name[locale] : undefined}
               orientation={placement.reversed ? reversed : upright}
               onClick={() => onActivate?.(position.id, revealed)}
@@ -485,6 +502,7 @@ export function ReadingPanels({
   onSave,
   onReset,
   savedMode = false,
+  activePosition = null,
 }: {
   spread: Spread;
   drawn: DrawnCard[];
@@ -498,12 +516,13 @@ export function ReadingPanels({
   onSave?: () => void;
   onReset?: () => void;
   savedMode?: boolean;
+  activePosition?: string | null;
 }) {
   const { t } = useI18n();
   const reading = buildReading({ question, spreadId: spread.id, drawn, locale });
 
   return (
-    <div className="mt-10 grid gap-6">
+    <div className={cn("grid gap-6", savedMode ? "mt-10" : "mt-6 lg:mt-0")}>
       <article className="rounded-3xl border border-primary/35 bg-card/70 p-5 sm:p-7" data-testid="reading-summary">
         <h2 className="font-display text-2xl text-primary">{t.summaryTitle}</h2>
         <div className="mt-4 space-y-6">
@@ -532,7 +551,15 @@ export function ReadingPanels({
         <h2 className="text-lg text-primary">{t.positionsTitle}</h2>
         <div className="mt-4 grid gap-4">
           {reading.chapters.map((chapter) => (
-            <article key={chapter.positionId} id={`pos-${chapter.positionId}`} className="rounded-2xl border border-border bg-card/45 p-4 sm:p-5">
+            <article
+              key={chapter.positionId}
+              id={`pos-${chapter.positionId}`}
+              data-testid="reading-chapter"
+              className={cn(
+                "reading-chapter rounded-2xl border border-border bg-card/45 p-4 sm:p-5",
+                activePosition === chapter.positionId && "is-current",
+              )}
+            >
               <p className="text-xs tracking-[0.2em] text-primary">{chapter.positionName}</p>
               <h3 className="mt-1 text-xl">
                 {chapter.cardName}

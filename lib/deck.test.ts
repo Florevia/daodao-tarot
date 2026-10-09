@@ -154,13 +154,11 @@ describe("shuffle and summary", () => {
 });
 
 describe("theme contrast", () => {
-  it("keeps text and gold at WCAG AA on the twilight surfaces", () => {
+  it("keeps the original night cloth and a parchment day cloth at WCAG AA", () => {
     const css = readFileSync(resolve("app/globals.css"), "utf8");
-    const root = css.slice(css.indexOf(":root {"), css.indexOf(".dark {"));
-    const token = (name: string) => {
-      const match = root.match(new RegExp(`${name}:\\s*oklch\\(([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)`));
-      assert.ok(match, name);
-      return [Number(match[1]), Number(match[2]), Number(match[3])] as [number, number, number];
+    const blocks = {
+      light: css.slice(css.indexOf(":root {"), css.indexOf(".dark {")),
+      dark: css.slice(css.indexOf(".dark {"), css.indexOf("@layer base")),
     };
     const ratio = (a: [number, number, number], b: [number, number, number]) => {
       const lum = ([L, C, H]: [number, number, number]) => {
@@ -184,17 +182,28 @@ describe("theme contrast", () => {
       const [hi, lo] = left > right ? [left, right] : [right, left];
       return (hi + 0.05) / (lo + 0.05);
     };
-    const background = token("--background");
-    const card = token("--card");
-    const foreground = token("--foreground");
-    const muted = token("--muted-foreground");
-    const primary = token("--primary");
-    const primaryInk = token("--primary-foreground");
-    for (const surface of [background, card]) {
-      assert.ok(ratio(foreground, surface) >= 4.5);
-      assert.ok(ratio(muted, surface) >= 4.5);
-      assert.ok(ratio(primary, surface) >= 4.5);
+    for (const [name, block] of Object.entries(blocks)) {
+      const token = (tokenName: string) => {
+        const match = block.match(new RegExp(`${tokenName}:\\s*oklch\\(([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)`));
+        assert.ok(match, `${name} ${tokenName}`);
+        return [Number(match[1]), Number(match[2]), Number(match[3])] as [number, number, number];
+      };
+      const background = token("--background");
+      const card = token("--card");
+      const foreground = token("--foreground");
+      const muted = token("--muted-foreground");
+      const primary = token("--primary");
+      const primaryInk = token("--primary-foreground");
+      for (const surface of [background, card]) {
+        assert.ok(ratio(foreground, surface) >= 4.5, name);
+        assert.ok(ratio(muted, surface) >= 4.5, name);
+        assert.ok(ratio(primary, surface) >= 4.5, name);
+      }
+      assert.ok(ratio(primaryInk, primary) >= 4.5, name);
     }
-    assert.ok(ratio(primaryInk, primary) >= 4.5);
+    const night = blocks.dark;
+    assert.match(night, /--background:\s*oklch\(0\.17 0\.03 300\)/);
+    assert.match(night, /--primary:\s*oklch\(0\.82 0\.09 85\)/);
+    assert.match(night, /--foreground:\s*oklch\(0\.95 0\.02 90\)/);
   });
 });

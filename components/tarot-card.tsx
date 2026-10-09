@@ -57,6 +57,7 @@ export function TarotFace({
 export function FlipCard({
   revealed,
   label,
+  kicker,
   name,
   orientation,
   onClick,
@@ -64,6 +65,7 @@ export function FlipCard({
 }: {
   revealed: boolean;
   label: string;
+  kicker?: string;
   name?: string;
   orientation?: string;
   onClick?: () => void;
@@ -79,7 +81,7 @@ export function FlipCard({
           <div className="flip-face flip-front">{children}</div>
         </div>
       </div>
-      <span className="slot-kicker">{label}</span>
+      <span className="slot-kicker">{kicker ?? label}</span>
       <span className={cn("slot-caption", !name && "invisible")}>
         {name ? `${name} · ${orientation}` : "·"}
       </span>
