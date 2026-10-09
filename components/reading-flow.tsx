@@ -52,7 +52,15 @@ export function ReadingFlow() {
   const allRevealed = allPlaced && placements.every((item) => item.revealed);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    const targetId = phase === "pick" ? "pick-stage" : phase === "reveal" ? "reveal-stage" : null;
+    if (!targetId) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [phase]);
 
   useEffect(() => {
@@ -293,39 +301,71 @@ export function ReadingFlow() {
         </section>
       ) : null}
 
-      {phase === "pick" || phase === "reveal" ? (
-        <section className="mt-8">
+      {phase === "pick" ? (
+        <section id="pick-stage" className="pick-stage mt-4" data-testid="pick-stage">
+          {question ? <p className="line-clamp-1 text-sm leading-6 text-foreground/90">「{question}」</p> : null}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="min-w-0 flex-1 text-base leading-7 text-primary sm:text-lg" data-testid="pick-prompt" aria-live="polite">
+              {nextPosition
+                ? pickSentence(locale, placements.length + 1, spread.positions.length, nextPosition.name[locale])
+                : t.deckLabel}
+            </p>
+            <Button variant="outline" className="h-10 shrink-0" onClick={beginShuffle}>
+              {t.reshuffle}
+            </Button>
+          </div>
+          <ol className="pick-strip" data-testid="pick-progress" aria-label={t.stepsLabel}>
+            {spread.positions.map((position, index) => {
+              const placed = index < placements.length;
+              const state = placed ? "done" : index === placements.length ? "current" : "upcoming";
+              return (
+                <li
+                  key={position.id}
+                  data-state={state}
+                  aria-current={state === "current" ? "step" : undefined}
+                >
+                  <span className="pick-mini" aria-hidden>
+                    {placed ? <CardBack /> : <span className="pick-mini-index">{index + 1}</span>}
+                  </span>
+                  <span className="pick-slot-label">
+                    {index + 1}/{spread.positions.length}
+                  </span>
+                  <span className="pick-slot-name">{position.name[locale]}</span>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="deck-grid mt-3" data-testid="deck-grid" aria-label={t.deckLabel}>
+            {deck.map((card) => (
+              <button
+                key={card.cardId}
+                type="button"
+                className="deck-pick"
+                data-testid="deck-card"
+                aria-label={t.pickThis}
+                onClick={() => pickCard(card.cardId)}
+              >
+                <CardBack />
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {phase === "reveal" ? (
+        <section id="reveal-stage" className="reveal-stage mt-4" data-testid="reveal-stage">
           {question ? <p className="max-w-3xl text-lg leading-8">「{question}」</p> : null}
           <p className="mt-2 text-sm text-muted-foreground">
             {spread.name[locale]} · {spread.positions.length} {t.cardCount}
           </p>
-          {phase === "pick" && nextPosition ? (
-            <div className="sticky top-16 z-20 mt-4 rounded-2xl border border-primary/35 bg-background/90 p-4 backdrop-blur-md">
-              <p className="text-lg leading-8 text-primary" data-testid="pick-prompt" aria-live="polite">
-                {pickSentence(locale, placements.length + 1, spread.positions.length, nextPosition.name[locale])}
-              </p>
-              <ol className="mt-3 flex flex-wrap gap-2" data-testid="pick-progress">
-                {spread.positions.map((position, index) => {
-                  const state = index < placements.length ? "done" : index === placements.length ? "current" : "upcoming";
-                  return (
-                    <li
-                      key={position.id}
-                      aria-current={state === "current" ? "step" : undefined}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-xs",
-                        state === "current" && "border-primary bg-primary/20 text-primary",
-                        state === "done" && "border-primary/40 text-foreground",
-                        state === "upcoming" && "border-border text-muted-foreground",
-                      )}
-                    >
-                      {index + 1} {position.name[locale]}
-                    </li>
-                  );
-                })}
-              </ol>
+          {!allRevealed ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <p className="text-sm text-primary">{t.flipHint}</p>
+              <Button className="h-11 px-6" onClick={revealAll} data-testid="reveal-all">
+                {t.revealAll}
+              </Button>
             </div>
           ) : null}
-          {phase === "reveal" && !allRevealed ? <p className="mt-4 text-sm text-primary">{t.flipHint}</p> : null}
           <SpreadTable
             spread={spread}
             placements={placements}
@@ -334,49 +374,17 @@ export function ReadingFlow() {
             reversed={t.reversed}
             emptyLabel={t.pickWaiting}
             faceDownLabel={t.pickedFaceDown}
-            compact={phase === "pick"}
-            onActivate={
-              phase === "reveal"
-                ? (positionId, revealed) => {
-                    if (!revealed) {
-                      reveal(positionId);
-                      return;
-                    }
-                    if (allRevealed) {
-                      document.getElementById(`pos-${positionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                  }
-                : undefined
-            }
+            onActivate={(positionId, revealed) => {
+              if (!revealed) {
+                reveal(positionId);
+                return;
+              }
+              if (allRevealed) {
+                document.getElementById(`pos-${positionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }}
           />
-          {phase === "pick" ? (
-            <>
-              <h2 className="mt-8 text-lg text-primary">{t.deckLabel}</h2>
-              <div className="deck-grid mt-4" data-testid="deck-grid" aria-label={t.deckLabel}>
-                {deck.map((card) => (
-                  <button
-                    key={card.cardId}
-                    type="button"
-                    className="deck-pick"
-                    data-testid="deck-card"
-                    aria-label={t.pickThis}
-                    onClick={() => pickCard(card.cardId)}
-                  >
-                    <CardBack />
-                  </button>
-                ))}
-              </div>
-              <Button variant="outline" className="mt-6 h-11" onClick={beginShuffle}>
-                {t.reshuffle}
-              </Button>
-            </>
-          ) : null}
-          {phase === "reveal" && !allRevealed ? (
-            <Button className="mt-6 h-11 px-6" onClick={revealAll} data-testid="reveal-all">
-              {t.revealAll}
-            </Button>
-          ) : null}
-          {phase === "reveal" && allRevealed ? (
+          {allRevealed ? (
             <ReadingPanels
               spread={spread}
               drawn={drawn}
