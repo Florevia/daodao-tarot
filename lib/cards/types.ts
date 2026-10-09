@@ -41,3 +41,7 @@ export type Card = {
 };
 
 export type CardText = Pick<Card, "keywords" | "description" | "upright" | "reversed">;
+
+export type TopicKey = "general" | "love" | "career" | "resources" | "advice";
+
+export type TopicSet = Record<TopicKey, Localized>;

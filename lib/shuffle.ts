@@ -1,5 +1,4 @@
 import { cards } from "./cards";
-import type { Card } from "./cards";
 import { getSpread, type Spread } from "./spreads";
 
 export type DrawnCard = {
@@ -7,6 +6,13 @@ export type DrawnCard = {
   cardId: string;
   reversed: boolean;
 };
+
+export type ShuffledCard = {
+  cardId: string;
+  reversed: boolean;
+};
+
+export const REVERSAL_RATE = 0.3;
 
 export function shuffleDeck<T>(items: readonly T[], random: () => number = Math.random): T[] {
   const next = [...items];
@@ -19,14 +25,42 @@ export function shuffleDeck<T>(items: readonly T[], random: () => number = Math.
   return next;
 }
 
+export function prepareDeck(random: () => number = Math.random): ShuffledCard[] {
+  return shuffleDeck(cards, random).map((card) => ({
+    cardId: card.id,
+    reversed: random() < REVERSAL_RATE,
+  }));
+}
+
 export function createReading(spread: Spread, random: () => number = Math.random): DrawnCard[] {
-  const deck = shuffleDeck(cards, random);
+  const deck = prepareDeck(random);
   return spread.positions.map((position, index) => {
-    const card = deck[index] as Card;
+    const card = deck[index] as ShuffledCard;
     return {
       positionId: position.id,
-      cardId: card.id,
-      reversed: random() < 0.3,
+      cardId: card.cardId,
+      reversed: card.reversed,
+    };
+  });
+}
+
+export function placePickedCards(spread: Spread, deck: readonly ShuffledCard[], pickedIds: readonly string[]): DrawnCard[] {
+  if (pickedIds.length !== spread.positions.length) {
+    throw new Error(`Expected ${spread.positions.length} picks for ${spread.id}`);
+  }
+  const byId = new Map(deck.map((card) => [card.cardId, card]));
+  const seen = new Set<string>();
+  return spread.positions.map((position, index) => {
+    const cardId = pickedIds[index] as string;
+    const card = byId.get(cardId);
+    if (!card || seen.has(cardId)) {
+      throw new Error(`Invalid pick ${cardId} for ${spread.id}`);
+    }
+    seen.add(cardId);
+    return {
+      positionId: position.id,
+      cardId: card.cardId,
+      reversed: card.reversed,
     };
   });
 }

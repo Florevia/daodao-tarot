@@ -2,10 +2,13 @@ import { cups } from "./cups";
 import { majorArcana } from "./major";
 import { pentacles } from "./pentacles";
 import { swords } from "./swords";
-import type { Card, Suit } from "./types";
+import { attachTopics, type RichCard } from "./topics";
+import type { Suit } from "./types";
 import { wands } from "./wands";
 
-export type { Card, CardText, ElementName, Locale, Localized, Rank, Suit } from "./types";
+export type { CardText, ElementName, Locale, Localized, Rank, Suit, TopicKey, TopicSet } from "./types";
+export type { RichCard };
+export type Card = RichCard;
 
 export const cards: Card[] = [
   ...majorArcana,
@@ -13,7 +16,7 @@ export const cards: Card[] = [
   ...cups,
   ...swords,
   ...pentacles,
-];
+].map(attachTopics);
 
 const byId = new Map(cards.map((card) => [card.id, card]));
 

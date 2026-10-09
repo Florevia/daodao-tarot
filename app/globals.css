@@ -50,24 +50,24 @@
 
 :root {
   --font-sans: "Noto Serif SC", "Songti SC", "Source Han Serif SC", serif;
-  --background: oklch(0.17 0.03 300);
-  --foreground: oklch(0.95 0.02 90);
-  --card: oklch(0.22 0.03 300);
-  --card-foreground: oklch(0.95 0.02 90);
-  --popover: oklch(0.21 0.035 300);
-  --popover-foreground: oklch(0.95 0.02 90);
-  --primary: oklch(0.82 0.09 85);
-  --primary-foreground: oklch(0.22 0.04 70);
-  --secondary: oklch(0.28 0.03 300);
-  --secondary-foreground: oklch(0.95 0.02 90);
-  --muted: oklch(0.26 0.025 300);
-  --muted-foreground: oklch(0.78 0.03 85);
-  --accent: oklch(0.33 0.04 70);
-  --accent-foreground: oklch(0.95 0.04 90);
-  --destructive: oklch(0.65 0.16 25);
-  --border: oklch(0.75 0.08 85 / 28%);
-  --input: oklch(0.75 0.08 85 / 35%);
-  --ring: oklch(0.82 0.09 85);
+  --background: oklch(0.36 0.062 285);
+  --foreground: oklch(0.985 0.012 95);
+  --card: oklch(0.48 0.052 288);
+  --card-foreground: oklch(0.985 0.012 95);
+  --popover: oklch(0.44 0.055 286);
+  --popover-foreground: oklch(0.985 0.012 95);
+  --primary: oklch(0.9 0.11 88);
+  --primary-foreground: oklch(0.27 0.05 70);
+  --secondary: oklch(0.52 0.045 286);
+  --secondary-foreground: oklch(0.985 0.012 95);
+  --muted: oklch(0.42 0.04 285);
+  --muted-foreground: oklch(0.93 0.02 95);
+  --accent: oklch(0.58 0.07 80);
+  --accent-foreground: oklch(0.985 0.015 95);
+  --destructive: oklch(0.7 0.17 25);
+  --border: oklch(0.9 0.09 88 / 42%);
+  --input: oklch(0.9 0.09 88 / 48%);
+  --ring: oklch(0.9 0.11 88);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -85,24 +85,24 @@
 }
 
 .dark {
-  --background: oklch(0.17 0.03 300);
-  --foreground: oklch(0.95 0.02 90);
-  --card: oklch(0.22 0.03 300);
-  --card-foreground: oklch(0.95 0.02 90);
-  --popover: oklch(0.21 0.035 300);
-  --popover-foreground: oklch(0.95 0.02 90);
-  --primary: oklch(0.82 0.09 85);
-  --primary-foreground: oklch(0.22 0.04 70);
-  --secondary: oklch(0.28 0.03 300);
-  --secondary-foreground: oklch(0.95 0.02 90);
-  --muted: oklch(0.26 0.025 300);
-  --muted-foreground: oklch(0.78 0.03 85);
-  --accent: oklch(0.33 0.04 70);
-  --accent-foreground: oklch(0.95 0.04 90);
-  --destructive: oklch(0.68 0.16 25);
-  --border: oklch(0.75 0.08 85 / 28%);
-  --input: oklch(0.75 0.08 85 / 35%);
-  --ring: oklch(0.82 0.09 85);
+  --background: oklch(0.36 0.062 285);
+  --foreground: oklch(0.985 0.012 95);
+  --card: oklch(0.48 0.052 288);
+  --card-foreground: oklch(0.985 0.012 95);
+  --popover: oklch(0.44 0.055 286);
+  --popover-foreground: oklch(0.985 0.012 95);
+  --primary: oklch(0.9 0.11 88);
+  --primary-foreground: oklch(0.27 0.05 70);
+  --secondary: oklch(0.52 0.045 286);
+  --secondary-foreground: oklch(0.985 0.012 95);
+  --muted: oklch(0.42 0.04 285);
+  --muted-foreground: oklch(0.93 0.02 95);
+  --accent: oklch(0.58 0.07 80);
+  --accent-foreground: oklch(0.985 0.015 95);
+  --destructive: oklch(0.72 0.16 25);
+  --border: oklch(0.9 0.09 88 / 42%);
+  --input: oklch(0.9 0.09 88 / 48%);
+  --ring: oklch(0.9 0.11 88);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -131,8 +131,9 @@
   body {
     font-family: var(--font-sans);
     background:
-      radial-gradient(900px 480px at 8% -10%, oklch(0.42 0.08 70 / 18%), transparent 55%),
-      radial-gradient(800px 520px at 110% 0%, oklch(0.35 0.1 300 / 45%), transparent 50%),
+      radial-gradient(980px 520px at 6% -8%, oklch(0.78 0.09 85 / 32%), transparent 58%),
+      radial-gradient(860px 560px at 110% -4%, oklch(0.62 0.1 300 / 50%), transparent 52%),
+      radial-gradient(700px 420px at 50% 120%, oklch(0.5 0.08 270 / 35%), transparent 55%),
       var(--background);
   }
   h1, h2, h3 {
@@ -172,11 +173,11 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid oklch(0.82 0.09 85 / 55%);
+  border: 1px solid oklch(0.9 0.11 88 / 70%);
   background:
-    radial-gradient(circle at 50% 40%, oklch(0.32 0.05 70 / 50%), transparent 62%),
-    oklch(0.18 0.03 300 / 80%);
-  box-shadow: 0 0 0 12px oklch(0.82 0.09 85 / 8%), 0 30px 80px oklch(0 0 0 / 40%);
+    radial-gradient(circle at 50% 38%, oklch(0.72 0.08 85 / 55%), transparent 62%),
+    oklch(0.46 0.07 290 / 88%);
+  box-shadow: 0 0 0 12px oklch(0.9 0.09 85 / 16%), 0 24px 50px oklch(0.22 0.05 290 / 28%);
 }
 
 .flip-scene {
@@ -342,6 +343,86 @@
   50% { transform: translateX(46px) rotate(12deg); }
 }
 
+.focus-note {
+  max-width: 42rem;
+  border-radius: 1.5rem;
+  border: 1px solid oklch(0.9 0.11 88 / 60%);
+  background: oklch(0.58 0.055 286 / 72%);
+  padding: 1.35rem 1.2rem;
+  text-align: center;
+  font-size: 1.2rem;
+  line-height: 2;
+  color: var(--foreground);
+  box-shadow: 0 16px 40px oklch(0.2 0.05 290 / 18%);
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.15rem, 1fr));
+  gap: 0.45rem;
+}
+
+.deck-pick {
+  aspect-ratio: 2 / 3.15;
+  width: 100%;
+  border-radius: 0.45rem;
+  overflow: hidden;
+  border: 1px solid oklch(0.9 0.11 88 / 55%);
+  box-shadow: 0 6px 14px oklch(0.18 0.04 290 / 28%);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.deck-pick:hover,
+.deck-pick:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 18px oklch(0.18 0.04 290 / 35%);
+}
+
+.deck-pick .card-back {
+  padding: 0.15rem;
+}
+
+.deck-pick .card-back svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.deck-pick .card-back span {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+}
+
+.slot-empty {
+  display: flex;
+  aspect-ratio: 2 / 3.45;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 0.8rem;
+  border: 1px dashed oklch(0.9 0.09 88 / 65%);
+  background: oklch(0.55 0.04 286 / 35%);
+  padding: 0.4rem;
+  text-align: center;
+}
+
+.reading-copy p + p {
+  margin-top: 0.85rem;
+}
+
+@media (min-width: 720px) {
+  .deck-grid {
+    grid-template-columns: repeat(auto-fill, minmax(3.6rem, 1fr));
+    gap: 0.55rem;
+  }
+  .focus-note {
+    font-size: 1.35rem;
+    padding: 1.7rem 1.6rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .flip-inner, .shuffle-card { animation: none; transition: none; }
+  .deck-pick { transition: none; }
 }

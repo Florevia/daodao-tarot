@@ -2,6 +2,7 @@ import { requireCard, type Locale } from "@/lib/cards";
 import { getSpread } from "@/lib/spreads";
 import { validateDrawnCards } from "@/lib/reading-record";
 import type { DrawnCard } from "@/lib/shuffle";
+import { positionMeaning, spreadTopic } from "@/lib/summary";
 import { connection } from "next/server";
 import { z } from "zod";
 
@@ -51,16 +52,24 @@ export async function POST(request: Request) {
   if (!spread) return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   const locale = parsed.data.locale as Locale;
   const question = parsed.data.question?.trim() || (locale === "zh" ? "（没有写下具体问题）" : "(no specific question)");
+  const topic = spreadTopic(parsed.data.spreadId);
   const lines = parsed.data.cards.map((drawn: DrawnCard) => {
     const card = requireCard(drawn.cardId);
     const position = spread.positions.find((item) => item.id === drawn.positionId);
+    const orient = drawn.reversed ? "reversed" : "upright";
+    const line = position
+      ? { position, card, reversed: drawn.reversed }
+      : null;
     return {
       position: position?.name[locale] ?? drawn.positionId,
       positionNote: position?.description[locale] ?? "",
       card: card.name[locale],
       orientation: drawn.reversed ? (locale === "zh" ? "逆位" : "reversed") : locale === "zh" ? "正位" : "upright",
       keywords: card.keywords[locale].join(locale === "zh" ? "、" : ", "),
-      meaning: drawn.reversed ? card.reversed[locale] : card.upright[locale],
+      meaning: card.topics[orient].general[locale],
+      spreadReading: card.topics[orient][topic][locale],
+      advice: card.topics[orient].advice[locale],
+      inPosition: line ? positionMeaning(line, locale, spread.id) : "",
     };
   });
 

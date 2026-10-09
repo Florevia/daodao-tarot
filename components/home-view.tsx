@@ -13,6 +13,7 @@ export function HomeView() {
     [t.step1Title, t.step1Body],
     [t.step2Title, t.step2Body],
     [t.step3Title, t.step3Body],
+    [t.step4Title, t.step4Body],
   ];
 
   return (
@@ -42,7 +43,7 @@ export function HomeView() {
 
       <section className="mx-auto max-w-6xl px-4">
         <h2 className="text-2xl text-primary">{t.howTitle}</h2>
-        <ol className="mt-5 grid gap-4 md:grid-cols-3">
+        <ol className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {steps.map(([title, body], index) => (
             <li key={title} className="rounded-3xl border border-primary/20 bg-card/50 p-5">
               <span className="font-display text-3xl text-primary/70">0{index + 1}</span>
