@@ -52,6 +52,10 @@ export function ReadingFlow() {
   const allRevealed = allPlaced && placements.every((item) => item.revealed);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [phase]);
+
+  useEffect(() => {
     void fetch("/api/interpret", { cache: "no-store" })
       .then((response) => response.json())
       .then((data: { available?: boolean }) => setAiAvailable(Boolean(data.available)))
@@ -330,6 +334,7 @@ export function ReadingFlow() {
             reversed={t.reversed}
             emptyLabel={t.pickWaiting}
             faceDownLabel={t.pickedFaceDown}
+            compact={phase === "pick"}
             onActivate={
               phase === "reveal"
                 ? (positionId, revealed) => {
@@ -404,6 +409,7 @@ export function SpreadTable({
   onActivate,
   emptyLabel,
   faceDownLabel,
+  compact = false,
 }: {
   spread: Spread;
   placements: Placement[];
@@ -413,9 +419,16 @@ export function SpreadTable({
   onActivate?: (positionId: string, revealed: boolean) => void;
   emptyLabel?: string;
   faceDownLabel?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="spread mt-6" data-layout={spread.layout} data-testid="spread-table" aria-label={spread.name[locale]}>
+    <div
+      className="spread mt-6"
+      data-layout={spread.layout}
+      data-picking={compact ? "true" : undefined}
+      data-testid="spread-table"
+      aria-label={spread.name[locale]}
+    >
       {spread.positions.map((position) => {
         const placement = placements.find((item) => item.positionId === position.id);
         const card = placement ? getCard(placement.cardId) : undefined;
