@@ -1,0 +1,337 @@
+"use client";
+
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
+
+const zh = {
+  brand: "叨叨占卜师",
+  brandEn: "Daodao Tarot",
+  navRead: "占卜",
+  navCards: "牌义",
+  navHistory: "记录",
+  navAccount: "账号",
+  login: "登录",
+  register: "注册",
+  logout: "退出",
+  langLabel: "语言",
+  heroKicker: "伟特塔罗 · 七十八张",
+  heroLead: "有些话你还没说完。把问题放下，叨叨会按牌面，一张一张讲给你听。",
+  startReading: "开始占卜",
+  browseCards: "翻开牌义全书",
+  howTitle: "一次占卜，这样展开",
+  step1Title: "写下问题",
+  step1Body: "可以很具体，也可以留空，让今天自己选一个天气。",
+  step2Title: "洗牌，再揭开",
+  step2Body: "牌先背过去。你决定先看哪一张，翻面时才露面。",
+  step3Title: "听完，再决定留不留",
+  step3Body: "每个位置有自己的意思，最后有一段综合。访客存在这台设备，登录后跟账号走。",
+  spreadsTitle: "五种展开方式",
+  examplesTitle: "如果你还没想好问什么",
+  example1: "这段关系，还值得我继续靠近吗？",
+  example2: "眼前的工作，我该留下还是转身？",
+  example3: "最近这股不安，到底在提醒我什么？",
+  example4: "今天有什么是我该轻轻看见的？",
+  useExample: "用这句提问",
+  footerDisclaimer: "占卜结果仅供娱乐与自我反思，不能替代医疗、法律、财务或心理方面的专业建议。",
+  footerArt: "牌面图为 1909 年 Pamela Colman Smith 绘制的伟特塔罗，公有领域。",
+  questionLabel: "你想问的事",
+  questionPlaceholder: "例如：这段关系还值得继续吗？可以留空。",
+  chooseSpread: "选择牌阵",
+  cardCount: "张",
+  shuffle: "洗牌",
+  shuffling: "正在洗牌",
+  skipShuffle: "跳过动画",
+  shuffleNote: "洗完之后，牌会背面朝上落到位置上。点哪张，就先看哪张。",
+  flipHint: "点按牌背揭开。你也可以一次翻开全部。",
+  revealAll: "全部翻开",
+  upright: "正位",
+  reversed: "逆位",
+  summaryTitle: "叨叨的综合",
+  positionsTitle: "逐张来看",
+  aiTitle: "再深入一层",
+  aiButton: "请叨叨按我的问题再说一次",
+  aiLoading: "叨叨正在组织语言…",
+  aiError: "这次没有接上解读，牌义综合仍然在上面。",
+  aiRate: "今天这一阵问得有点密，先歇一歇。",
+  save: "保存这次占卜",
+  saving: "保存中…",
+  saved: "已保存",
+  saveError: "没有保存成功，请再试一次。",
+  savedGuest: "已留在这台设备上。登录后可以带到别的地方。",
+  savedAccount: "已保存到你的账号。",
+  newReading: "再占一次",
+  disclaimerShort: "仅供娱乐与自我反思。",
+  historyTitle: "占卜记录",
+  historyLead: "翻过的牌还在。可以回来再读，也可以删掉。",
+  historyEmpty: "还没有记录。先去抽一组牌，再决定要不要留下。",
+  historyGuest: "你正在以访客身份使用。记录只在这台浏览器里。",
+  historyAccount: "这些记录跟着你的账号。",
+  historyError: "记录没有加载出来。",
+  retry: "再试一次",
+  importLocal: "把这台设备上的访客记录导入账号",
+  importHint: "这台设备上还有访客记录。",
+  importing: "导入中…",
+  imported: "已导入账号，本机副本已清除。",
+  importError: "有几条没能导入，本机记录还留着。",
+  noQuestion: "未写下问题",
+  delete: "删除",
+  confirmDelete: "删除这条记录？",
+  deleteBody: "删掉之后不能恢复。",
+  cancel: "取消",
+  loading: "正在展开…",
+  notFound: "这一页不在牌里",
+  notFoundBody: "地址可能写错了，或者这张牌已经不在桌上。",
+  backHome: "回到首页",
+  historyMissing: "没有找到这条记录。",
+  encyclopediaTitle: "牌义全书",
+  encyclopediaLead: "七十八张伟特塔罗。点开任意一张，看它正位与逆位在说什么。",
+  searchPlaceholder: "搜索牌名或关键词",
+  filterAll: "全部",
+  filterMajor: "大阿卡纳",
+  suitWands: "权杖",
+  suitCups: "圣杯",
+  suitSwords: "宝剑",
+  suitPentacles: "星币",
+  elementFire: "火",
+  elementWater: "水",
+  elementAir: "风",
+  elementEarth: "土",
+  arcanaMajor: "大阿卡纳",
+  arcanaMinor: "小阿卡纳",
+  keywords: "关键词",
+  aboutCard: "画面",
+  uprightMeaning: "正位",
+  reversedMeaning: "逆位",
+  prevCard: "上一张",
+  nextCard: "下一张",
+  emptySearch: "没有对上的牌。换个词，或清掉筛选。",
+  resultCount: "张牌",
+  loginTitle: "登录",
+  registerTitle: "注册",
+  loginLead: "登录之后，占卜记录会跟着账号走。",
+  registerLead: "用邮箱和密码留一个位子。注册后会直接登录。",
+  email: "邮箱",
+  password: "密码",
+  passwordHint: "至少 8 位。",
+  submitLogin: "登录",
+  submitRegister: "注册并进入",
+  noAccount: "还没有账号？",
+  hasAccount: "已经有账号？",
+  badCredentials: "邮箱或密码不对。",
+  emailTaken: "这个邮箱已经注册过了。",
+  invalidInput: "请检查邮箱和密码。",
+  unauthorized: "请先登录。",
+  genericError: "没有完成，请再试一次。",
+  accountTitle: "账号",
+  accountLead: "邮箱用来找回你的记录。密码可以在这里更换。",
+  changePassword: "更换密码",
+  currentPassword: "当前密码",
+  nextPassword: "新密码",
+  passwordChanged: "密码已更新。",
+  phaseAsk: "提问",
+  phaseShuffle: "洗牌",
+  phaseDraw: "揭牌",
+  phaseRead: "解读",
+  openMeaning: "看这张的解读",
+  guestCta: "登录以同步记录",
+  readingEyebrow: "一次占卜",
+  backToHistory: "返回记录",
+  spreadCards: "张牌",
+};
+
+const en: { [K in keyof typeof zh]: string } = {
+  brand: "叨叨占卜师",
+  brandEn: "Daodao Tarot",
+  navRead: "Reading",
+  navCards: "Cards",
+  navHistory: "History",
+  navAccount: "Account",
+  login: "Log in",
+  register: "Register",
+  logout: "Log out",
+  langLabel: "Language",
+  heroKicker: "Rider–Waite · 78 cards",
+  heroLead: "Some sentences are still unfinished. Set the question down. Daodao will talk through the cards, one at a time.",
+  startReading: "Begin a reading",
+  browseCards: "Open the card book",
+  howTitle: "How a reading unfolds",
+  step1Title: "Write the question",
+  step1Body: "Be specific, or leave it blank and let the day choose the weather.",
+  step2Title: "Shuffle, then turn",
+  step2Body: "The cards land face down. You choose which one to see first.",
+  step3Title: "Listen, then decide what to keep",
+  step3Body: "Each position speaks, then a summary gathers them. Guests keep history on this device. Accounts carry it with them.",
+  spreadsTitle: "Five ways to lay the cards",
+  examplesTitle: "If the question is not ready",
+  example1: "Is this relationship still worth moving toward?",
+  example2: "Should I stay in this work, or turn?",
+  example3: "What is this recent unease trying to show me?",
+  example4: "What should I see gently today?",
+  useExample: "Ask this",
+  footerDisclaimer: "Readings are for entertainment and reflection. They are not a substitute for medical, legal, financial, or psychological advice.",
+  footerArt: "Card art is the 1909 Pamela Colman Smith Rider–Waite deck, public domain.",
+  questionLabel: "What you want to ask",
+  questionPlaceholder: "For example: is this relationship still worth it? You can leave this blank.",
+  chooseSpread: "Choose a spread",
+  cardCount: "cards",
+  shuffle: "Shuffle",
+  shuffling: "Shuffling",
+  skipShuffle: "Skip the animation",
+  shuffleNote: "After the shuffle, cards land face down. Turn whichever one you want to see first.",
+  flipHint: "Tap a card back to turn it. You can also turn them all.",
+  revealAll: "Turn all",
+  upright: "Upright",
+  reversed: "Reversed",
+  summaryTitle: "Daodao's summary",
+  positionsTitle: "Card by card",
+  aiTitle: "One layer deeper",
+  aiButton: "Ask Daodao to speak to my question",
+  aiLoading: "Daodao is finding the words…",
+  aiError: "The extra reading did not arrive. The card summary above still stands.",
+  aiRate: "That is a lot of questions for one hour. Rest a moment.",
+  save: "Save this reading",
+  saving: "Saving…",
+  saved: "Saved",
+  saveError: "It did not save. Please try again.",
+  savedGuest: "Kept on this device. Log in when you want it to travel with you.",
+  savedAccount: "Saved to your account.",
+  newReading: "Read again",
+  disclaimerShort: "For entertainment and reflection.",
+  historyTitle: "Reading history",
+  historyLead: "The cards you turned are still here. Read them again, or let them go.",
+  historyEmpty: "Nothing saved yet. Draw a spread, then decide whether to keep it.",
+  historyGuest: "You are visiting. These readings stay in this browser.",
+  historyAccount: "These readings follow your account.",
+  historyError: "The history did not load.",
+  retry: "Try again",
+  importLocal: "Import this device's guest readings",
+  importHint: "Guest readings are still on this device.",
+  importing: "Importing…",
+  imported: "Imported. The local copies were cleared.",
+  importError: "Some readings did not import. The local copies are still here.",
+  noQuestion: "No question written",
+  delete: "Delete",
+  confirmDelete: "Delete this reading?",
+  deleteBody: "This cannot be undone.",
+  cancel: "Cancel",
+  loading: "Laying the cloth…",
+  notFound: "This page is not in the deck",
+  notFoundBody: "The address may be wrong, or that card is no longer on the table.",
+  backHome: "Back home",
+  historyMissing: "That reading could not be found.",
+  encyclopediaTitle: "Card book",
+  encyclopediaLead: "All seventy-eight Rider–Waite cards. Open any one for its upright and reversed meanings.",
+  searchPlaceholder: "Search names or keywords",
+  filterAll: "All",
+  filterMajor: "Major Arcana",
+  suitWands: "Wands",
+  suitCups: "Cups",
+  suitSwords: "Swords",
+  suitPentacles: "Pentacles",
+  elementFire: "Fire",
+  elementWater: "Water",
+  elementAir: "Air",
+  elementEarth: "Earth",
+  arcanaMajor: "Major Arcana",
+  arcanaMinor: "Minor Arcana",
+  keywords: "Keywords",
+  aboutCard: "The picture",
+  uprightMeaning: "Upright",
+  reversedMeaning: "Reversed",
+  prevCard: "Previous",
+  nextCard: "Next",
+  emptySearch: "No card matched. Try another word, or clear the filter.",
+  resultCount: "cards",
+  loginTitle: "Log in",
+  registerTitle: "Register",
+  loginLead: "After you log in, readings follow the account.",
+  registerLead: "Keep a place with your email and a password. You will be signed in right away.",
+  email: "Email",
+  password: "Password",
+  passwordHint: "At least 8 characters.",
+  submitLogin: "Log in",
+  submitRegister: "Create account",
+  noAccount: "No account yet?",
+  hasAccount: "Already have an account?",
+  badCredentials: "That email or password does not match.",
+  emailTaken: "That email is already registered.",
+  invalidInput: "Check the email and password.",
+  unauthorized: "Please log in first.",
+  genericError: "That did not finish. Try again.",
+  accountTitle: "Account",
+  accountLead: "Your email is how the readings find you. You can change the password here.",
+  changePassword: "Change password",
+  currentPassword: "Current password",
+  nextPassword: "New password",
+  passwordChanged: "Password updated.",
+  phaseAsk: "Ask",
+  phaseShuffle: "Shuffle",
+  phaseDraw: "Turn",
+  phaseRead: "Read",
+  openMeaning: "Read this card",
+  guestCta: "Log in to sync history",
+  readingEyebrow: "A reading",
+  backToHistory: "Back to history",
+  spreadCards: "cards",
+};
+
+export type Messages = typeof zh;
+export type Locale = "zh" | "en";
+
+const STORAGE_KEY = "daodao-tarot-locale";
+
+const I18nContext = createContext<{
+  locale: Locale;
+  t: Messages;
+  setLocale: (locale: Locale) => void;
+} | null>(null);
+
+function subscribeLocale(callback: () => void) {
+  window.addEventListener("daodao-locale", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("daodao-locale", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function readLocale(): Locale {
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  return stored === "en" ? "en" : "zh";
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const locale = useSyncExternalStore(subscribeLocale, readLocale, () => "zh" as Locale);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+  }, [locale]);
+
+  const value = useMemo(
+    () => ({
+      locale,
+      t: locale === "zh" ? zh : en,
+      setLocale: (next: Locale) => {
+        window.localStorage.setItem(STORAGE_KEY, next);
+        window.dispatchEvent(new Event("daodao-locale"));
+      },
+    }),
+    [locale],
+  );
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n() {
+  const context = useContext(I18nContext);
+  if (!context) throw new Error("useI18n must be used within I18nProvider");
+  return context;
+}
+
+export function errorText(code: string, t: Messages): string {
+  if (code === "BAD_CREDENTIALS") return t.badCredentials;
+  if (code === "EMAIL_TAKEN") return t.emailTaken;
+  if (code === "INVALID_INPUT") return t.invalidInput;
+  if (code === "UNAUTHORIZED") return t.unauthorized;
+  if (code === "RATE_LIMIT") return t.aiRate;
+  return t.genericError;
+}
