@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   // The dev server binds 0.0.0.0 and reports localhost; browsers on 127.0.0.1
   // are otherwise blocked from Next.js dev resources and never hydrate.
   allowedDevOrigins: ["127.0.0.1"],
+  devIndicators: false,
   poweredByHeader: false,
   async headers() {
     return [
