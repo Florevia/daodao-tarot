@@ -82,7 +82,12 @@ export function SiteHeader() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button render={<Link href="/login" />} className="h-8 px-3" variant="secondary">
+            <Button
+              nativeButton={false}
+              render={<Link href="/login" />}
+              className="h-8 px-3"
+              variant="secondary"
+            >
               {t.login}
             </Button>
           )}

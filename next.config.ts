@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  // The dev server binds 0.0.0.0 and reports localhost; browsers on 127.0.0.1
+  // are otherwise blocked from Next.js dev resources and never hydrate.
+  allowedDevOrigins: ["127.0.0.1"],
   poweredByHeader: false,
   async headers() {
     return [

@@ -421,7 +421,7 @@ export function ReadingPanels({
             {t.newReading}
           </Button>
           {saveState === "saved" ? (
-            <Button variant="ghost" className="h-11" render={<Link href="/history" />}>
+            <Button nativeButton={false} variant="ghost" className="h-11" render={<Link href="/history" />}>
               {t.navHistory}
             </Button>
           ) : null}
