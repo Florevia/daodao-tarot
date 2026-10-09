@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   devIndicators: false,
   poweredByHeader: false,
+  // Keep Prisma's query engine external so the Vercel file trace ships the
+  // binary instead of trying to bundle it.
+  serverExternalPackages: ["@prisma/client", "prisma"],
   async headers() {
     return [
       {

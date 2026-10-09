@@ -14,12 +14,12 @@ Readings are for entertainment and reflection. They are not a substitute for pro
 
 ## 本地运行
 
-需要 Node.js 20 或更新版本。
+需要 Node.js 20 或更新版本，以及 Docker。本地数据库和线上一样是 PostgreSQL，由 `docker-compose.yml` 启动（用户 `daodao`，密码 `daodao`，库名 `daodao`，端口 `5432`）。
 
 ```bash
+docker compose up -d --wait
 cp .env.example .env
 npm install
-npx prisma migrate deploy
 npm run dev
 ```
 
@@ -31,68 +31,93 @@ npm run dev
 npm test        # 牌组、牌阵、洗牌与综合解读
 npm run lint
 npm run typecheck
-npm run build
+npm run build   # 设置了 DATABASE_URL 时会先执行 prisma migrate deploy
 npm start
+npm run db:migrate
 ```
 
-`npm run dev` 会先执行 `prisma generate` 和 `prisma migrate deploy`，所以本机数据库会自动跟上迁移。
+`npm run dev` 会先执行 `prisma generate` 和 `prisma migrate deploy`，所以本机数据库会自动跟上迁移。没有 Docker 时，自己准备一个 Postgres 16，把 `.env` 里的 `DATABASE_URL` 指过去，再执行同样的命令即可。
 
 ## Run locally
 
-Node.js 20 or newer.
+Node.js 20 or newer, and Docker. Local development uses PostgreSQL, the same engine as production. `docker-compose.yml` starts it (user `daodao`, password `daodao`, database `daodao`, port `5432`).
 
 ```bash
+docker compose up -d --wait
 cp .env.example .env
 npm install
-npx prisma migrate deploy
 npm run dev
 ```
 
 Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 
-`npm run dev` runs `prisma generate` and `prisma migrate deploy` before the dev server.
+`npm run dev` runs `prisma generate` and `prisma migrate deploy` before the dev server. Without Docker, point `DATABASE_URL` in `.env` at any Postgres 16 instance and use the same commands.
 
 ## 环境变量
 
 | 变量 | 是否必须 | 说明 |
 | --- | --- | --- |
-| `DATABASE_URL` | 本地必须 | 默认 `file:./dev.db`，路径相对于 `prisma/`。 |
+| `DATABASE_URL` | 必须 | Postgres 连接串。本地见 `.env.example`。生产环境用直连（不要用连接池地址），并带上服务商要求的 `sslmode`。 |
 | `AUTH_SECRET` | 生产必须 | 用来签名登录 cookie。本地可以沿用 `.env.example` 里的开发值。 |
 | `OPENAI_API_KEY` | 可选 | 有密钥时，占卜结果里会出现「再深入一层」。没有密钥时，仍使用内置牌义综合。 |
 | `OPENAI_BASE_URL` | 可选 | 默认 `https://api.openai.com/v1`。兼容 OpenAI 接口的网关可以改这里。 |
 | `OPENAI_MODEL` | 可选 | 默认 `gpt-4o-mini`。 |
-| `NEXT_PUBLIC_SITE_URL` | 建议 | 站点公开地址，用于 sitemap 和 Open Graph。例如 `https://your-domain.com`。 |
+| `NEXT_PUBLIC_SITE_URL` | 生产建议 | 站点公开地址，用于 sitemap 和 Open Graph。例如 `https://your-domain.vercel.app`。 |
 
 ## Environment variables
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes locally | Defaults to `file:./dev.db`, relative to `prisma/`. |
+| `DATABASE_URL` | Yes | Postgres connection string. Local value is in `.env.example`. In production use the direct URL, not a pooler, and include the provider's `sslmode`. |
 | `AUTH_SECRET` | Yes in production | Signs the session cookie. The example value is fine for local development. |
 | `OPENAI_API_KEY` | No | When set, a reading can request a personalized interpretation. Without it, the built-in summary is the whole reading. |
 | `OPENAI_BASE_URL` | No | Defaults to `https://api.openai.com/v1`. Point this at an OpenAI-compatible gateway if you use one. |
 | `OPENAI_MODEL` | No | Defaults to `gpt-4o-mini`. |
-| `NEXT_PUBLIC_SITE_URL` | Recommended | Public origin used by the sitemap and Open Graph tags. |
+| `NEXT_PUBLIC_SITE_URL` | Recommended in production | Public origin used by the sitemap and Open Graph tags, for example `https://your-domain.vercel.app`. |
 
-## 部署
+## 部署到 Vercel
 
-本机用 SQLite。Vercel 这类无服务器托管没有可写的本地磁盘，上线时请换成 Postgres（Neon、Supabase、Vercel Postgres 都可以）。
+Prisma 已经使用 PostgreSQL。不要改构建命令：Vercel 的 Next.js 默认会执行 `npm run build`。这个脚本会 `prisma generate`，在 `DATABASE_URL` 有值时执行 `prisma migrate deploy`，然后 `next build`。没有 `DATABASE_URL` 时会跳过迁移，方便在没有数据库的环境里只做编译检查。`OPENAI_API_KEY` 不参与构建，不设置也能完整占卜。
 
-1. 把 `prisma/schema.prisma` 里的 `provider = "sqlite"` 改成 `provider = "postgresql"`。模型字段不用改。
-2. 把 `DATABASE_URL` 设成 Postgres 连接串。如果走连接池，建议使用带 `?pgbouncer=true` 的池化地址，并把直连地址留给迁移。
-3. 设置 `AUTH_SECRET`（长随机字符串）和 `NEXT_PUBLIC_SITE_URL`。
-4. 构建命令保持 `npm run build`（其中包含 `prisma generate`）。发布前执行一次 `npx prisma migrate deploy`。在 Vercel 上可以把构建命令写成 `prisma generate && prisma migrate deploy && next build`。
-5. 可选：设置 `OPENAI_API_KEY`。不设置也不影响占卜、牌义全书和记录。
+在 Vercel 项目的 Settings → Environment Variables 里，为 Production（以及需要登录记录的 Preview）设置：
 
-## Deploy
+| 变量 | 值 |
+| --- | --- |
+| `DATABASE_URL` | Postgres **直连**字符串，不要用带 `-pooler` 的地址。Neon：在连接串面板关掉 Pooled connection，原样复制（含 `sslmode=require`）。Vercel Postgres：把集成提供的 `POSTGRES_URL_NON_POOLING` 填进 `DATABASE_URL`。如果集成已经写了一个池化的 `DATABASE_URL`，用直连字符串覆盖它。构建阶段要跑迁移，事务池化会让 `prisma migrate deploy` 失败。 |
+| `AUTH_SECRET` | 长随机字符串，例如 `openssl rand -base64 32` 的输出。 |
+| `NEXT_PUBLIC_SITE_URL` | 站点公开地址，无路径、无结尾斜杠，例如 `https://daodao-tarot.vercel.app`。 |
+| `OPENAI_API_KEY` | 可选。不填则只有内置牌义综合。 |
 
-SQLite is for local development. Serverless hosts such as Vercel do not give you a writable local disk, so production should use Postgres (Neon, Supabase, or Vercel Postgres).
+然后：
 
-1. In `prisma/schema.prisma`, change `provider = "sqlite"` to `provider = "postgresql"`. The models stay the same.
-2. Set `DATABASE_URL` to the Postgres connection string. If you use a pooler, prefer the pooled URL with `?pgbouncer=true` for the app and a direct URL for migrations.
-3. Set `AUTH_SECRET` to a long random string, and set `NEXT_PUBLIC_SITE_URL`.
-4. Keep the build script as `npm run build` (it runs `prisma generate`). Run `npx prisma migrate deploy` once before or during release. On Vercel the build command can be `prisma generate && prisma migrate deploy && next build`.
-5. `OPENAI_API_KEY` is optional. Readings, the card book, and history all work without it.
+1. 把仓库导入 Vercel，Framework Preset 选 Next.js。Install Command 和 Build Command 保持默认（`npm install` 与 `npm run build`）。
+2. 确认上面的环境变量已经写在将要部署的环境里。构建机器必须能连上数据库。
+3. Deploy。首次构建会建好 `User` 和 `Reading` 表。
+4. 打开线上地址，注册一个账号，抽一组牌并保存，再在记录页打开并删除，确认数据库可用。
+
+如果 Neon 或 Vercel 另外提供了 `DATABASE_URL_UNPOOLED`、`POSTGRES_URL_NON_POOLING` 或 `DIRECT_URL`，构建脚本会优先用它们做迁移，运行时仍读 `DATABASE_URL`。只设置直连的 `DATABASE_URL` 就够用。
+
+## Deploy to Vercel
+
+Prisma is already on PostgreSQL. Leave the Vercel build command at the Next.js default, `npm run build`. That script runs `prisma generate`, then `prisma migrate deploy` when `DATABASE_URL` is set, then `next build`. If `DATABASE_URL` is absent, migrations are skipped. `OPENAI_API_KEY` is not required to build or to use the app.
+
+In the Vercel project, under Settings → Environment Variables, set these for Production (and for any Preview where signed-in history should work):
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | The **direct** Postgres URL, not the host that contains `-pooler`. On Neon, turn off Pooled connection and copy the string as shown, including `sslmode=require`. On Vercel Postgres, copy `POSTGRES_URL_NON_POOLING` into `DATABASE_URL`. If the integration already created a pooled `DATABASE_URL`, replace it with the direct string. Migrations run during the build, and a transaction pooler makes `prisma migrate deploy` fail. |
+| `AUTH_SECRET` | A long random string, for example the output of `openssl rand -base64 32`. |
+| `NEXT_PUBLIC_SITE_URL` | The public origin, with no path and no trailing slash, for example `https://daodao-tarot.vercel.app`. |
+| `OPENAI_API_KEY` | Optional. Omit it and readings still include the built-in summary. |
+
+Then:
+
+1. Import the repository into Vercel and choose the Next.js framework preset. Leave Install Command and Build Command at their defaults (`npm install` and `npm run build`).
+2. Confirm the variables above exist on the environment you are deploying. The build must be able to reach the database.
+3. Deploy. The first build creates the `User` and `Reading` tables.
+4. On the live site, register, draw and save a reading, then open and delete it from history.
+
+If Neon or Vercel also sets `DATABASE_URL_UNPOOLED`, `POSTGRES_URL_NON_POOLING`, or `DIRECT_URL`, the build script prefers those for migrations and still uses `DATABASE_URL` at runtime. A single direct `DATABASE_URL` is enough.
 
 ## 牌图来源
 
@@ -118,14 +143,14 @@ The 78 images in `public/cards/` come from the Wikimedia Commons category [Rider
 
 ## 限制
 
-- 生产环境不要继续用 SQLite 文件。
+- 生产环境使用 Postgres 直连字符串作为 `DATABASE_URL`。无服务器函数各自建连接，流量很大时再考虑连接池。
 - AI 解读依赖你自己的 API 额度，并且每小时对同一 IP 大约限制 20 次。
 - 牌义是简短的现代解读，不是某一本书的全文。
 - 没有第三方登录，也没有密码重置邮件。
 
 ## Limitations
 
-- Do not keep the SQLite file as the production database.
+- Production expects a direct Postgres URL in `DATABASE_URL`. Each serverless instance opens its own connections; add a pooler only after you actually hit connection limits.
 - AI interpretations spend your own API quota and are limited to about 20 requests per IP each hour.
 - Meanings are short modern readings, not the full text of a printed book.
 - There is no social login and no password-reset email.

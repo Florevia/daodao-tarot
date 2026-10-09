@@ -1,12 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Vercel builds and runs on Amazon Linux. `native` covers the machine that
+  // runs `prisma generate`; the rhel target is the serverless runtime.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
-// Local development uses SQLite. For hosted Postgres, change provider to
-// "postgresql" and point DATABASE_URL at your database. The models themselves
-// stay the same.
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
