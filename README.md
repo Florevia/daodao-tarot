@@ -60,7 +60,7 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | `DATABASE_URL` | 必须 | Postgres 连接串。本地见 `.env.example`。生产环境用直连（不要用连接池地址），并带上服务商要求的 `sslmode`。 |
 | `AUTH_SECRET` | 生产必须 | 用来签名登录 cookie。本地可以沿用 `.env.example` 里的开发值。 |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | 可选 | 有密钥时，翻开牌后会自动请 Gemini 按知识库写一份解牌。`GEMINI_API_KEY` 是同一密钥的别名。没有密钥、调用失败或超过每小时次数时，改用内置牌义。 |
-| `GEMINI_MODEL` | 可选 | 默认 `gemini-2.5-flash`。 |
+| `GEMINI_MODEL` | 可选 | 默认 `gemini-3.6-flash`。若该模型不可用，会再试 `gemini-3.8-flash`，然后 `gemini-flash-latest`。 |
 | `NEXT_PUBLIC_SITE_URL` | 生产建议 | 站点公开地址，用于 sitemap 和 Open Graph。例如 `https://your-domain.vercel.app`。 |
 
 ## Environment variables
@@ -70,7 +70,7 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | `DATABASE_URL` | Yes | Postgres connection string. Local value is in `.env.example`. In production use the direct URL, not a pooler, and include the provider's `sslmode`. |
 | `AUTH_SECRET` | Yes in production | Signs the session cookie. The example value is fine for local development. |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | No | When set, revealing the cards asks Gemini for one reading grounded in the knowledge base. `GEMINI_API_KEY` is an alias. With no key, a failed call, or the hourly limit, the built-in reading is shown instead. |
-| `GEMINI_MODEL` | No | Defaults to `gemini-2.5-flash`. |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.6-flash`. If that model is unavailable, the server tries `gemini-3.8-flash`, then `gemini-flash-latest`. |
 | `NEXT_PUBLIC_SITE_URL` | Recommended in production | Public origin used by the sitemap and Open Graph tags, for example `https://your-domain.vercel.app`. |
 
 ## 部署到 Vercel

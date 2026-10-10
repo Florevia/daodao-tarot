@@ -6,6 +6,7 @@ import {
   GEMINI_TIMEOUT_MS,
   INTERPRET_HOURLY_LIMIT,
   candidateText,
+  geminiModelChain,
   geminiReadingBody,
   requestGeminiInterpretation,
   thinkingConfigFor,
@@ -14,12 +15,15 @@ import { getSpread } from "./spreads";
 import { createReading, mulberry32 } from "./shuffle";
 
 describe("gemini", () => {
-  it("defaults to gemini-2.5-flash and waits 90 seconds", () => {
-    assert.equal(DEFAULT_GEMINI_MODEL, "gemini-2.5-flash");
+  it("defaults to gemini-3.6-flash and waits 90 seconds", () => {
+    assert.equal(DEFAULT_GEMINI_MODEL, "gemini-3.6-flash");
     assert.equal(GEMINI_TIMEOUT_MS, 90_000);
     assert.equal(INTERPRET_HOURLY_LIMIT, 30);
     assert.deepEqual(thinkingConfigFor("gemini-2.5-flash"), { thinkingBudget: 0 });
+    assert.deepEqual(thinkingConfigFor("gemini-3.6-flash"), { thinkingLevel: "low" });
     assert.deepEqual(thinkingConfigFor("gemini-3.8-flash"), { thinkingLevel: "low" });
+    assert.deepEqual(thinkingConfigFor("gemini-flash-latest"), { thinkingLevel: "low" });
+    assert.equal(JSON.stringify(thinkingConfigFor("gemini-3.6-flash")).includes("minimal"), false);
   });
 
   it("joins text parts and skips a thoughtSignature-only part", () => {
@@ -82,16 +86,16 @@ describe("gemini", () => {
       fetchImpl: async (url, init) => {
         assert.equal(
           String(url),
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
         );
         const headers = new Headers(init?.headers);
         assert.equal(headers.get("x-goog-api-key"), "test-key-not-real");
         assert.equal(url.toString().includes("test-key-not-real"), false);
         const body = JSON.parse(String(init?.body)) as {
-          generationConfig: { responseMimeType?: string; thinkingConfig: { thinkingBudget?: number } };
+          generationConfig: { responseMimeType?: string; thinkingConfig: { thinkingLevel?: string; thinkingBudget?: number } };
           contents: { parts: { text: string }[] }[];
         };
-        assert.equal(body.generationConfig.thinkingConfig.thinkingBudget, 0);
+        assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, "low");
         assert.equal(body.generationConfig.responseMimeType, "application/json");
         const sent = body.contents[0]?.parts[0]?.text ?? "";
         assert.match(sent, /已婚或同居/);
@@ -157,6 +161,120 @@ describe("gemini", () => {
       fetchImpl: async () => Response.json({ candidates: [{ content: { parts: [{ thoughtSignature: "only" }] } }] }),
     });
     assert.deepEqual(empty, { error: "AI_FAILED", reason: "empty" });
+  });
+
+  it("walks the model chain when the primary model is unavailable", async () => {
+    assert.deepEqual(geminiModelChain("gemini-3.6-flash"), [
+      "gemini-3.6-flash",
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+    ]);
+    assert.deepEqual(geminiModelChain("gemini-3.8-flash"), ["gemini-3.8-flash", "gemini-flash-latest"]);
+    const positions = [{ id: "past", names: ["过去"] }];
+    const calls: string[] = [];
+    const levels: string[] = [];
+    const result = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "sys",
+      user: { question: "love" },
+      positions,
+      fetchImpl: async (url, init) => {
+        const address = String(url);
+        calls.push(address);
+        const body = JSON.parse(String(init?.body)) as { generationConfig: { thinkingConfig: { thinkingLevel?: string } } };
+        levels.push(body.generationConfig.thinkingConfig.thinkingLevel ?? "");
+        if (address.includes("gemini-3.6-flash")) {
+          return new Response("This model models/gemini-3.6-flash is no longer available", { status: 404 });
+        }
+        if (address.includes("gemini-3.8-flash")) {
+          return new Response("high demand", { status: 503 });
+        }
+        return Response.json({
+          candidates: [{ content: { parts: [{ text: JSON.stringify({
+            cards: [{ positionId: "past", body: "过去这一张。" }],
+            connection: "连在一起。",
+            conclusion: "先做一件小事。",
+          }) }] } }],
+        });
+      },
+    });
+    assert.deepEqual(calls.map((url) => url.split("/models/")[1]?.split(":")[0]), [
+      "gemini-3.6-flash",
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+    ]);
+    assert.deepEqual(levels, ["low", "low", "low"]);
+    assert.equal(JSON.stringify(result).includes("secret-value"), false);
+    assert.deepEqual(result, {
+      reading: {
+        cards: [{ positionId: "past", body: "过去这一张。" }],
+        connection: "连在一起。",
+        conclusion: "先做一件小事。",
+      },
+    });
+
+    const stopped: string[] = [];
+    const modelError = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-2.5-flash",
+      system: "sys",
+      user: {},
+      positions,
+      fetchImpl: async (url, init) => {
+        stopped.push(String(url));
+        const body = JSON.parse(String(init?.body)) as { generationConfig: { thinkingConfig: { thinkingBudget?: number; thinkingLevel?: string } } };
+        if (String(url).includes("gemini-2.5-flash")) {
+          assert.equal(body.generationConfig.thinkingConfig.thinkingBudget, 0);
+          return new Response('{"error":"thinkingLevel MINIMAL is not supported"}', { status: 400 });
+        }
+        return new Response("rate limited", { status: 429 });
+      },
+    });
+    assert.deepEqual(stopped.map((url) => url.split("/models/")[1]?.split(":")[0]), [
+      "gemini-2.5-flash",
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+    ]);
+    assert.deepEqual(modelError, { error: "AI_FAILED", reason: "upstream" });
+
+    let unrelated = 0;
+    const plain = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "sys",
+      user: {},
+      positions,
+      fetchImpl: async () => {
+        unrelated += 1;
+        return new Response("invalid payload", { status: 400 });
+      },
+    });
+    assert.equal(unrelated, 1);
+    assert.deepEqual(plain, { error: "AI_FAILED", reason: "upstream" });
+  });
+
+  it("does not start the next model after the shared deadline", async () => {
+    let calls = 0;
+    const result = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "sys",
+      user: {},
+      positions: [{ id: "past", names: ["过去"] }],
+      timeoutMs: 40,
+      fetchImpl: (_url, init) =>
+        new Promise((_resolve, reject) => {
+          calls += 1;
+          const keepAlive = setTimeout(() => reject(new Error("abort did not fire")), 1000);
+          init?.signal?.addEventListener("abort", () => {
+            clearTimeout(keepAlive);
+            reject(init.signal?.reason);
+          });
+        }),
+    });
+    assert.equal(calls, 1);
+    assert.deepEqual(result, { error: "AI_FAILED", reason: "timeout" });
   });
 
   it("keeps a structured answer and still opens an older plain-text reading", () => {

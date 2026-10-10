@@ -8,8 +8,11 @@ import { orientation, positionMeaning, readingLines, synthesisSignals } from "./
 /** Every reveal calls Gemini, so allow a full evening of readings and retries, then fall back to the library. */
 export const INTERPRET_HOURLY_LIMIT = 30;
 
-/** Fast Chinese-capable flash model. Override with GEMINI_MODEL. */
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+/** Current flash model that still accepts new keys and handles Chinese. Override with GEMINI_MODEL. */
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+
+/** Tried, in order, when the chosen model is missing, overloaded, or rate-limited. */
+export const GEMINI_FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"] as const;
 
 /**
  * Multi-card readings were exceeding the old 30s abort. 90s stays under
@@ -42,14 +45,29 @@ export function geminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 }
 
+/** Primary first, then the fallbacks, without asking the same model twice. */
+export function geminiModelChain(primary: string): string[] {
+  const chain: string[] = [];
+  for (const model of [primary, ...GEMINI_FALLBACK_MODELS]) {
+    const name = model.trim();
+    if (name && !chain.includes(name)) chain.push(name);
+  }
+  return chain;
+}
+
 /**
- * generateContent on Gemini 2.5 rejects thinkingLevel. thinkingBudget 0 turns
- * thinking off so a six-card reading does not sit in thought tokens. Gemini 3
- * still uses thinkingLevel; "low" is the fastest level those models accept.
+ * Gemini 3 and flash-latest accept thinkingLevel, and "low" is the fastest
+ * level they support ("minimal" is rejected). Gemini 2.x only accepts a budget.
  */
 export function thinkingConfigFor(model: string): { thinkingBudget: number } | { thinkingLevel: "low" } {
-  if (model.includes("gemini-2.5") || model.includes("gemini-2.0")) return { thinkingBudget: 0 };
+  if (/(?:^|\/)gemini-2(?:[.-]|$)/.test(model) || model.includes("gemini-2.")) return { thinkingBudget: 0 };
   return { thinkingLevel: "low" };
+}
+
+function modelUnavailable(status: number, body: string): boolean {
+  if (status === 404 || status === 429 || status === 503) return true;
+  if (status !== 400) return false;
+  return /model|thinking|no longer available|not supported|not found/i.test(body);
 }
 
 /** Keep answer text. Drop thoughtSignature-only parts, which have no `text`. */
@@ -154,38 +172,46 @@ export async function requestGeminiInterpretation(input: {
 }): Promise<GeminiSuccess | GeminiFailure> {
   const timeoutMs = input.timeoutMs ?? GEMINI_TIMEOUT_MS;
   const fetchImpl = input.fetchImpl ?? fetch;
-  try {
-    const response = await fetchImpl(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": input.apiKey,
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: input.system }] },
-          contents: [{ role: "user", parts: [{ text: JSON.stringify(input.user) }] }],
-          generationConfig: {
-            temperature: 0.7,
-            responseMimeType: "application/json",
-            responseSchema,
-            thinkingConfig: thinkingConfigFor(input.model),
+  const signal = AbortSignal.timeout(timeoutMs);
+  const chain = geminiModelChain(input.model);
+  for (const model of chain) {
+    if (signal.aborted) return { error: "AI_FAILED", reason: "timeout" };
+    try {
+      const response = await fetchImpl(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": input.apiKey,
           },
-        }),
-        signal: AbortSignal.timeout(timeoutMs),
-      },
-    );
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => undefined);
-      return { error: "AI_FAILED", reason: "upstream" };
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: input.system }] },
+            contents: [{ role: "user", parts: [{ text: JSON.stringify(input.user) }] }],
+            generationConfig: {
+              temperature: 0.7,
+              responseMimeType: "application/json",
+              responseSchema,
+              thinkingConfig: thinkingConfigFor(model),
+            },
+          }),
+          signal,
+        },
+      );
+      if (!response.ok) {
+        const body = response.status === 400 ? await response.text().catch(() => "") : "";
+        if (response.status !== 400) await response.body?.cancel().catch(() => undefined);
+        if (modelUnavailable(response.status, body)) continue;
+        return { error: "AI_FAILED", reason: "upstream" };
+      }
+      const payload = (await response.json()) as GeminiPayload;
+      const text = candidateText(payload.candidates?.[0]?.content?.parts);
+      const reading = text ? parseAiReading(text, input.positions) : null;
+      if (!reading) return { error: "AI_FAILED", reason: "empty" };
+      return { reading };
+    } catch (error) {
+      return { error: "AI_FAILED", reason: isGeminiTimeout(error) || signal.aborted ? "timeout" : "upstream" };
     }
-    const payload = (await response.json()) as GeminiPayload;
-    const text = candidateText(payload.candidates?.[0]?.content?.parts);
-    const reading = text ? parseAiReading(text, input.positions) : null;
-    if (!reading) return { error: "AI_FAILED", reason: "empty" };
-    return { reading };
-  } catch (error) {
-    return { error: "AI_FAILED", reason: isGeminiTimeout(error) ? "timeout" : "upstream" };
   }
+  return { error: "AI_FAILED", reason: "upstream" };
 }
