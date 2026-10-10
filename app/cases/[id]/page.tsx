@@ -7,8 +7,6 @@ export function generateStaticParams() {
   return readingCases.map((item) => ({ id: item.id }));
 }
 
-export const dynamicParams = false;
-
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await props.params;
   const item = getCase(id);
