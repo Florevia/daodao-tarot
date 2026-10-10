@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "占卜",
-  description: "在叨叨占卜师选择牌阵、洗牌、揭牌，并读到每一张牌在位置里的意思。",
+  description: "在叨叨占卜师选择牌阵、洗牌、解牌，并读到每一张牌在位置里的意思。",
 };
 
 export default function Page() {
