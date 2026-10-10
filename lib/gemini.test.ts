@@ -49,6 +49,19 @@ describe("gemini", () => {
       cards: drawn,
     });
     assert.match(system, /简体中文/);
+    assert.match(system, /不要断言医疗、法律、财务或绝对的未来/);
+    assert.match(system, /不要出现「仅供娱乐」/);
+    assert.doesNotMatch(system, /以仅供娱乐收尾|close with an entertainment/);
+    const english = geminiReadingBody({
+      question: "How does this marriage continue?",
+      spread,
+      locale: "en",
+      context: { status: "partnered", focus: "direction" },
+      cards: drawn,
+    });
+    assert.match(english.system, /Do not claim medical, legal, financial, or absolute future facts/);
+    assert.match(english.system, /do not close with that kind of line/);
+    assert.doesNotMatch(english.system, /close with an entertainment and reflection sentence/);
     assert.equal(user.situation, "已婚或同居 · 关系走向");
     assert.equal(user.cards.length, 6);
     assert.match(user.signals, /阿卡纳|逆位/);

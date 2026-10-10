@@ -320,7 +320,7 @@ export function ReadingFlow() {
           </div>
           <aside className="rounded-3xl border border-primary/30 bg-card/60 p-5">
             <p className="text-sm leading-7 text-foreground/85">{t.shuffleNote}</p>
-            <p className="mt-4 text-xs text-primary">{t.disclaimerShort}</p>
+            <p className="mt-4 text-xs leading-6 text-muted-foreground">{t.disclaimerShort}</p>
           </aside>
         </section>
       ) : null}

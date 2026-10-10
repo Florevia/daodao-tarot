@@ -8,9 +8,9 @@ Daodao Tarot is a tarot app meant for real use. The interface defaults to Simpli
 
 Write a question or leave it blank, choose a spread, watch the shuffle, then turn the cards in any order. Each position explains the card in that place, and a summary is built from those meanings. Guest history stays in the browser. Signed-in history is stored on the server. The app is complete without an AI key.
 
-占卜结果仅供娱乐与自我反思，不能替代医疗、法律、财务或心理方面的专业建议。
+塔罗解读意在帮助你看清处境、梳理思路。涉及健康、法律、财务等重要决定时，请同时听取专业人士的意见。
 
-Readings are for entertainment and reflection. They are not a substitute for professional medical, legal, financial, or psychological advice.
+Tarot readings are meant to help you see your situation clearly and sort through your thoughts. For important decisions about health, law, or money, please also seek professional advice.
 
 ## 本地运行
 
