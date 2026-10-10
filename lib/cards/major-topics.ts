@@ -1,6 +1,6 @@
 import type { Localized } from "./types";
 
-function L(zh: string, en: string): Localized {
+export function L(zh: string, en: string): Localized {
   return { zh, en };
 }
 
@@ -11,7 +11,7 @@ export type DomainCopy = {
   advice: Localized;
 };
 
-function domains(
+export function domains(
   love: Localized,
   career: Localized,
   resources: Localized,
@@ -270,8 +270,8 @@ export const majorTopics: Record<string, { upright: DomainCopy; reversed: Domain
     ),
     reversed: domains(
       L(
-        "逆位的恋人是价值观错位、三角牵扯，或是迟迟不选择。关系里的暧昧如果让人痛苦，就不是浪漫，是未完成的决定。看清你在逃避哪一个“不”。",
-        "Reversed, the Lovers is a mismatch of values, a triangle, or a choice endlessly delayed. Ambiguity that hurts is not romance. It is an unfinished decision. See which “no” you are avoiding.",
+        "逆位的恋人是迟迟不选择，或两个人要的生活对不上。关系里的含糊如果已经让人痛，就不是余味，是一个没做完的决定。先看清你在逃避哪一个“不”，不要默认外面还有第三个人。",
+        "Reversed, the Lovers is a choice that will not be made, or two lives that do not match. Ambiguity that already hurts is not romance. It is an unfinished decision. See which “no” you are avoiding, and do not assume a third person is in the room.",
       ),
       L(
         "工作上容易因为怕选错而两边都抓，结果两边都浅。或是合作的价值观其实并不一致。先停止一个你已经知道不对的选项。",

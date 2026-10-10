@@ -1,13 +1,6 @@
 import { majorTopics } from "./major-topics";
-import { rankVoice, suitVoice } from "./minor-voice";
+import { minorTopics } from "./minor-topics";
 import type { Card, Localized, TopicKey, TopicSet } from "./types";
-
-const topicName: Record<Exclude<TopicKey, "general">, Localized> = {
-  love: { zh: "感情", en: "love" },
-  career: { zh: "事业", en: "work" },
-  resources: { zh: "身心、金钱与成长", en: "the body, money, and growth" },
-  advice: { zh: "可以怎么做", en: "what to do" },
-};
 
 export type RichCard = Card & {
   topics: {
@@ -24,16 +17,11 @@ function domainCopy(card: Card, orient: "upright" | "reversed", key: Exclude<Top
     }
     return hand[orient][key];
   }
-  if (!card.rank || !card.suit) {
-    throw new Error(`Minor card is missing rank or suit: ${card.id}`);
+  const hand = minorTopics[card.id];
+  if (!hand) {
+    throw new Error(`Missing minor topics for ${card.id}`);
   }
-  const rankLine = rankVoice[card.rank][orient][key];
-  const suitLine = suitVoice[card.suit][orient][key];
-  const words = card.keywords;
-  return {
-    zh: `${card.name.zh}谈到${topicName[key].zh}时，围绕${words.zh.join("、")}。${rankLine.zh}${suitLine.zh}`,
-    en: `When ${card.name.en} speaks of ${topicName[key].en}, it circles ${words.en.join(", ")}. ${rankLine.en} ${suitLine.en}`,
-  };
+  return hand[orient][key];
 }
 
 function topicSet(card: Card, orient: "upright" | "reversed"): TopicSet {

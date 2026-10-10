@@ -49,7 +49,76 @@ describe("deck", () => {
     }
     assert.deepEqual(short, []);
   });
+
+  it("keeps minor topic texts specific to the card, not the number", () => {
+    const topics = ["general", "love", "career", "resources", "advice"] as const;
+    const orients = ["upright", "reversed"] as const;
+    const suits = ["wands", "cups", "swords", "pentacles"] as const;
+    const tooClose: string[] = [];
+    for (let rank = 1; rank <= 14; rank++) {
+      const group = suits.map((suit) => getCard(`${suit}-${String(rank).padStart(2, "0")}`)!);
+      for (const orient of orients) {
+        for (const key of topics) {
+          for (let i = 0; i < group.length; i++) {
+            for (let j = i + 1; j < group.length; j++) {
+              const a = group[i]!.topics[orient][key].zh;
+              const b = group[j]!.topics[orient][key].zh;
+              const score = dice(a, b);
+              const shared = longestShared(a, b);
+              if (score >= 0.42 || shared >= 14) {
+                tooClose.push(
+                  `${group[i]!.id} ~ ${group[j]!.id} ${orient} ${key} dice=${score.toFixed(2)} shared=${shared}`,
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+    assert.deepEqual(tooClose, []);
+  });
 });
+
+function dice(a: string, b: string): number {
+  const left = bigrams(a);
+  const right = bigrams(b);
+  let leftCount = 0;
+  let rightCount = 0;
+  let overlap = 0;
+  for (const count of left.values()) leftCount += count;
+  for (const count of right.values()) rightCount += count;
+  if (leftCount === 0 || rightCount === 0) return 0;
+  for (const [gram, count] of left) overlap += Math.min(count, right.get(gram) ?? 0);
+  return (2 * overlap) / (leftCount + rightCount);
+}
+
+function bigrams(text: string): Map<string, number> {
+  const compact = text.replace(/[^\u4e00-\u9fff]/g, "");
+  const grams = new Map<string, number>();
+  for (let index = 0; index < compact.length - 1; index++) {
+    const gram = compact.slice(index, index + 2);
+    grams.set(gram, (grams.get(gram) ?? 0) + 1);
+  }
+  return grams;
+}
+
+function longestShared(a: string, b: string): number {
+  const left = a.replace(/[^\u4e00-\u9fff]/g, "");
+  const right = b.replace(/[^\u4e00-\u9fff]/g, "");
+  let best = 0;
+  for (let size = 14; size <= Math.min(left.length, 40); size++) {
+    let found = false;
+    for (let index = 0; index <= left.length - size; index++) {
+      if (right.includes(left.slice(index, index + size))) {
+        found = true;
+        best = size;
+        break;
+      }
+    }
+    if (!found) break;
+  }
+  return best;
+}
 
 describe("spreads", () => {
   it("ships the five required layouts", () => {

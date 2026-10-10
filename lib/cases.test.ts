@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { getCard } from "./cards/index";
 import { examplesForPrompt, readingCases, selectExampleCases } from "./cases";
 import { geminiReadingBody } from "./gemini";
-import { contextTopic, sanitizeContext } from "./reading-context";
+import { sanitizeContext } from "./reading-context";
 import { getSpread } from "./spreads";
 import { createReading, mulberry32 } from "./shuffle";
 
@@ -14,13 +14,39 @@ function sentences(text: string): string[] {
     .filter(Boolean);
 }
 
-function grounded(body: string, cardId: string, reversed: boolean, topic: "general" | "love" | "career" | "resources"): boolean {
+const bannedProse = [
+  "关键词落在",
+  "你带进这段关系的",
+  "六张牌要放在一起看",
+  "五张牌是一条",
+  "事业上，三支持合作",
+  "七是评估与守住",
+  "五是冲突与失去舒适",
+  "三角关系",
+  "列出真实的资源",
+  "做完这一件，再看要不要谈更大的决定",
+  "谈到感情时，围绕",
+  "你可以先做的一件事",
+  "先看见忧虑",
+  "从策略下手",
+  "对方此刻更接近",
+  "你们之间实际的那根线",
+  "让关系发紧的地方",
+  "眼下更有用的做法",
+  "若维持现在的方式",
+  "工作此刻的表面天气",
+  "还没被说清、却在影响局面",
+  "你已经拿得出来的力量",
+  "让进展变慢的阻力",
+  "接下来更值得走的方向",
+  "过去已经成形、仍牵着现在的",
+  "今天最想被看见的，是",
+];
+
+function usesKeyword(body: string, cardId: string): boolean {
   const card = getCard(cardId);
   assert.ok(card);
-  const text = card.topics[reversed ? "reversed" : "upright"][topic].zh;
-  const parts = sentences(text).filter((part) => part.length >= 12);
-  const pool = card.arcana === "minor" && parts.length >= 3 ? parts.slice(1) : parts;
-  return pool.some((part) => body.includes(part.slice(0, 12)));
+  return card.keywords.zh.some((word) => body.includes(word));
 }
 
 describe("reading cases", () => {
@@ -52,7 +78,6 @@ describe("reading cases", () => {
       );
       assert.deepEqual(sanitizeContext(item.spreadId, item.context), item.context);
       const seen = new Set<string>();
-      const topic = contextTopic(item.spreadId, item.context);
       for (const drawn of item.cards) {
         assert.equal(seen.has(drawn.cardId), false, `${item.id} repeats ${drawn.cardId}`);
         seen.add(drawn.cardId);
@@ -65,12 +90,14 @@ describe("reading cases", () => {
         const count = sentences(drawn.body).length;
         assert.ok(count >= 2 && count <= 4, `${item.id} ${drawn.positionId} has ${count} sentences`);
         assert.ok(drawn.body.includes(card.name.zh), `${item.id} ${drawn.positionId}`);
-        assert.equal(grounded(drawn.body, drawn.cardId, drawn.reversed, topic), true, `${item.id} ${drawn.cardId}`);
+        assert.equal(usesKeyword(drawn.body, drawn.cardId), true, `${item.id} ${drawn.cardId}`);
+        assert.equal(bannedProse.some((phrase) => drawn.body.includes(phrase)), false, `${item.id} ${drawn.positionId}`);
         assert.equal(drawn.body.includes("仅供娱乐"), false);
         assert.equal(/entertainment/i.test(drawn.body), false);
       }
       assert.ok(sentences(item.connection).length >= 2, item.id);
-      assert.ok(item.conclusion.includes("你可以先做的一件事"), item.id);
+      assert.ok(sentences(item.conclusion).length >= 1 && item.conclusion.length >= 24, item.id);
+      assert.equal(bannedProse.some((phrase) => `${item.connection}${item.conclusion}`.includes(phrase)), false, item.id);
       assert.equal(item.connection.includes("仅供娱乐") || item.conclusion.includes("仅供娱乐"), false);
       assert.equal(/entertainment/i.test(`${item.connection} ${item.conclusion}`), false);
     }
@@ -78,6 +105,15 @@ describe("reading cases", () => {
     assert.equal(majors.size, 22);
     assert.equal(minors.size, 56);
     const ratio = reversed / total;
+    const openings = new Map<string, number>();
+    for (const item of readingCases) {
+      for (const drawn of item.cards) {
+        const opening = drawn.body.slice(0, 8);
+        openings.set(opening, (openings.get(opening) ?? 0) + 1);
+      }
+    }
+    const repeated = [...openings.entries()].filter(([, count]) => count > 3);
+    assert.deepEqual(repeated, []);
     assert.ok(ratio >= 0.3 && ratio <= 0.4, String(ratio));
     const multi = readingCases.filter((item) => item.spreadId === "love" || item.spreadId === "career");
     assert.ok(multi.some((item) => item.cards.filter((card) => card.reversed).length / item.cards.length <= 0.25));

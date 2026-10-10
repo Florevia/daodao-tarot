@@ -128,7 +128,7 @@ The 78 images in `public/cards/` come from the Wikimedia Commons category [Rider
 ## 功能说明
 
 - 牌阵数据在 `lib/spreads.ts`。现有五种：每日一牌、三牌阵（过去 / 现在 / 未来）、关系、事业、凯尔特十字（10 张）。按同样的结构追加即可。
-- 一百个解牌案例在 `data/cases.json`，由 `scripts/author-cases.ts` 按知识库牌义写成。翻牌时会挑 2 到 3 个最接近的案例，作为 Gemini 的风格参照，不代替本次的牌义。站点里可以在「案例」页浏览。
+- 一百个解牌案例写在 `data/cases.json`。`scripts/author-cases.ts` 只做校验，不再生成正文。翻牌时会挑 2 到 3 个最接近的案例，作为 Gemini 的风格参照，不代替本次的牌义。站点里可以在「案例」页浏览。
 - 访客记录在 `localStorage`（键名 `daodao-tarot-readings-v1`）。登录后可以在记录页把本机记录导入账号。
 - 账号是邮箱加密码，会话放在 httpOnly cookie 里。登录后可以在「账号」页修改密码。没有邮件服务，所以没有找回密码邮件。
 - 语言偏好存在本机。页面初次渲染是中文，方便搜索引擎抓取。
@@ -136,7 +136,7 @@ The 78 images in `public/cards/` come from the Wikimedia Commons category [Rider
 ## What is included
 
 - Spreads live in `lib/spreads.ts`: daily card, three-card past/present/future, relationship, career, and the 10-card Celtic Cross. Add another object in that list to add a spread.
-- One hundred worked readings live in `data/cases.json`, written by `scripts/author-cases.ts` from the knowledge base. A reveal sends the two or three closest cases to Gemini as style references. They do not replace the meanings of the cards just drawn. The Cases page lists them.
+- One hundred worked readings live in `data/cases.json`. `scripts/author-cases.ts` only validates them. A reveal sends the two or three closest cases to Gemini as style references. They do not replace the meanings of the cards just drawn. The Cases page lists them.
 - Guest history is stored in `localStorage` under `daodao-tarot-readings-v1`. After login, the history page can import those readings into the account.
 - Accounts use email and password. The session is an httpOnly cookie. A signed-in user can change the password on the account page. There is no password-reset email because the app does not send mail.
 - The language preference stays on the device. The first render is Chinese so search engines see that text.
