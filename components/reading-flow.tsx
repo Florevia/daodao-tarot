@@ -597,7 +597,6 @@ export function ReadingPanels({
           activePosition={activePosition}
           connectionTitle={t.connectionTitle}
           conclusionTitle={t.conclusionTitle}
-          disclaimer={t.disclaimerShort}
         />
       ) : null}
 
@@ -605,7 +604,6 @@ export function ReadingPanels({
         <article className="rounded-3xl border border-primary/35 bg-card/70 p-5 sm:p-7" data-testid="reading-answer">
           {situation ? <p className="text-sm text-primary" data-testid="reading-context">{situation}</p> : null}
           <p className="mt-4 leading-8 whitespace-pre-wrap">{view.text}</p>
-          <p className="mt-4 text-xs text-muted-foreground">{t.disclaimerShort}</p>
         </article>
       ) : null}
 
@@ -636,7 +634,6 @@ export function ReadingPanels({
                 </section>
               ))}
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">{t.disclaimerShort}</p>
           </article>
           <section className="mt-6" data-testid="reading-detail">
             <h2 className="text-lg text-primary">{t.positionsTitle}</h2>
@@ -704,7 +701,6 @@ function AiAnswer({
   activePosition,
   connectionTitle,
   conclusionTitle,
-  disclaimer,
 }: {
   spread: Spread;
   drawn: DrawnCard[];
@@ -714,7 +710,6 @@ function AiAnswer({
   activePosition: string | null;
   connectionTitle: string;
   conclusionTitle: string;
-  disclaimer: string;
 }) {
   return (
     <div className="grid gap-4" data-testid="reading-answer">
@@ -751,7 +746,6 @@ function AiAnswer({
         <h3 className="text-lg text-primary">{conclusionTitle}</h3>
         <p className="mt-2 leading-8">{reading.conclusion}</p>
       </section>
-      <p className="text-xs text-muted-foreground">{disclaimer}</p>
     </div>
   );
 }
