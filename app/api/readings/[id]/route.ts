@@ -4,7 +4,7 @@ import { serializeReading } from "@/lib/serialize-reading";
 import { z } from "zod";
 
 const patchSchema = z.object({
-  aiInterpretation: z.string().max(8000).nullable(),
+  aiInterpretation: z.string().max(24000).nullable(),
 });
 
 async function ownedReading(id: string, userId: string) {

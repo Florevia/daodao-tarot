@@ -11,12 +11,13 @@ import { errorText, useI18n } from "@/lib/i18n";
 import type { ReadingRecord } from "@/lib/reading-record";
 import { getSpread, isSpreadId, spreads, type Spread } from "@/lib/spreads";
 import { prepareDeck, type DrawnCard, type ShuffledCard } from "@/lib/shuffle";
+import { readStoredAnswer, type AiReading } from "@/lib/ai-reading";
 import { contextComplete, contextLabel, type ReadingContext } from "@/lib/reading-context";
 import { buildReading, buildSummary } from "@/lib/summary";
 import { cn } from "cn";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type Phase = "ask" | "shuffle" | "pick" | "reveal";
@@ -42,10 +43,12 @@ export function ReadingFlow() {
   const [phase, setPhase] = useState<Phase>("ask");
   const [deck, setDeck] = useState<ShuffledCard[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
-  const [savedId, setSavedId] = useState<string | null>(null);
-  const [aiText, setAiText] = useState<string | null>(null);
-  const [aiAvailable, setAiAvailable] = useState(false);
-  const [aiState, setAiState] = useState<"idle" | "loading" | "error">("idle");
+  const [aiReading, setAiReading] = useState<AiReading | null>(null);
+  const [answerState, setAnswerState] = useState<"loading" | "ai" | "fallback">("loading");
+  const [failReason, setFailReason] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const savedIdRef = useRef<string | null>(null);
+  const userRef = useRef(user);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [activePosition, setActivePosition] = useState<string | null>(null);
   const [context, setContext] = useState<ReadingContext>({});
@@ -69,11 +72,8 @@ export function ReadingFlow() {
   }, [phase]);
 
   useEffect(() => {
-    void fetch("/api/interpret", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { available?: boolean }) => setAiAvailable(Boolean(data.available)))
-      .catch(() => setAiAvailable(false));
-  }, []);
+    userRef.current = user;
+  }, [user]);
 
   const drawn = useMemo(
     () => placements.map(({ positionId, cardId, reversed }) => ({ positionId, cardId, reversed })),
@@ -83,9 +83,11 @@ export function ReadingFlow() {
   function resetReading() {
     setDeck([]);
     setPlacements([]);
-    setSavedId(null);
-    setAiText(null);
-    setAiState("idle");
+    savedIdRef.current = null;
+    setAiReading(null);
+    setAnswerState("loading");
+    setFailReason("");
+    setAttempt(0);
     setSaveState("idle");
     setActivePosition(null);
   }
@@ -147,7 +149,7 @@ export function ReadingFlow() {
       locale,
       cards: drawn,
       context,
-      aiInterpretation: aiText,
+      aiInterpretation: aiReading ? JSON.stringify(aiReading) : null,
     };
     try {
       if (user) {
@@ -162,7 +164,7 @@ export function ReadingFlow() {
           toast.error(errorText(data.error ?? "", t));
           return;
         }
-        setSavedId(data.reading.id);
+        savedIdRef.current = data.reading.id;
         setSaveState("saved");
         toast.success(t.savedAccount);
         return;
@@ -176,10 +178,10 @@ export function ReadingFlow() {
         cards: drawn,
         summary,
         context,
-        aiInterpretation: aiText,
+        aiInterpretation: aiReading ? JSON.stringify(aiReading) : null,
       };
       upsertGuestReading(reading);
-      setSavedId(reading.id);
+      savedIdRef.current = reading.id;
       setSaveState("saved");
       toast.success(t.savedGuest);
     } catch {
@@ -188,37 +190,48 @@ export function ReadingFlow() {
     }
   }
 
-  async function interpret() {
-    setAiState("loading");
-    try {
-      const response = await fetch("/api/interpret", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, spreadId: spread.id, locale, cards: drawn, context }),
-      });
-      const data = (await response.json()) as { interpretation?: string; error?: string };
-      if (!response.ok || !data.interpretation) {
-        setAiState("error");
-        toast.error(errorText(data.error ?? "", t));
-        return;
-      }
-      setAiText(data.interpretation);
-      setAiState("idle");
-      if (savedId && user) {
-        await fetch(`/api/readings/${savedId}`, {
-          method: "PATCH",
+  const drawKey = placements.map((item) => `${item.positionId}:${item.cardId}:${item.reversed}:${item.revealed}`).join("|");
+
+  useEffect(() => {
+    if (phase !== "reveal" || !allRevealed || answerState !== "loading") return;
+    const controller = new AbortController();
+    const payload = { question, spreadId: spread.id, locale, cards: drawn, context };
+    void (async () => {
+      try {
+        const response = await fetch("/api/interpret", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ aiInterpretation: data.interpretation }),
+          body: JSON.stringify(payload),
+          signal: controller.signal,
         });
-      } else if (savedId) {
-        const existing = loadGuestReadings().find((item) => item.id === savedId);
-        if (existing) upsertGuestReading({ ...existing, aiInterpretation: data.interpretation });
+        const data = (await response.json()) as { reading?: AiReading; error?: string };
+        if (controller.signal.aborted) return;
+        if (!response.ok || !data.reading) {
+          setFailReason(data.error ?? "");
+          setAnswerState("fallback");
+          return;
+        }
+        setAiReading(data.reading);
+        setAnswerState("ai");
+        const stored = JSON.stringify(data.reading);
+        const id = savedIdRef.current;
+        if (id && userRef.current) {
+          await fetch(`/api/readings/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ aiInterpretation: stored }),
+          });
+        } else if (id) {
+          const existing = loadGuestReadings().find((item) => item.id === id);
+          if (existing) upsertGuestReading({ ...existing, aiInterpretation: stored });
+        }
+      } catch {
+        if (controller.signal.aborted) return;
+        setAnswerState("fallback");
       }
-    } catch {
-      setAiState("error");
-      toast.error(t.aiError);
-    }
-  }
+    })();
+    return () => controller.abort();
+  }, [phase, allRevealed, answerState, drawKey, attempt, locale, question, spread.id, context, drawn]);
 
   const phaseLabel = {
     ask: t.phaseAsk,
@@ -424,12 +437,21 @@ export function ReadingFlow() {
                   locale={locale}
                   question={question}
                   context={context}
-                  aiText={aiText}
-                  aiAvailable={aiAvailable}
-                  aiState={aiState}
+                  view={
+                    answerState === "ai" && aiReading
+                      ? { kind: "ai", reading: aiReading }
+                      : answerState === "fallback"
+                        ? { kind: "fallback", reason: failReason }
+                        : { kind: "loading" }
+                  }
                   saveState={saveState}
                   activePosition={activePosition}
-                  onInterpret={() => void interpret()}
+                  onRetry={() => {
+                    setAiReading(null);
+                    setFailReason("");
+                    setAnswerState("loading");
+                    setAttempt((value) => value + 1);
+                  }}
                   onSave={() => void save()}
                   onReset={() => {
                     resetReading();
@@ -512,17 +534,22 @@ export function SpreadTable({
   );
 }
 
+type AnswerView =
+  | { kind: "loading" }
+  | { kind: "ai"; reading: AiReading }
+  | { kind: "fallback"; reason?: string }
+  | { kind: "saved-prose"; text: string }
+  | { kind: "saved-kb" };
+
 export function ReadingPanels({
   spread,
   drawn,
   locale,
   question,
   context = null,
-  aiText,
-  aiAvailable,
-  aiState,
+  view,
   saveState,
-  onInterpret,
+  onRetry,
   onSave,
   onReset,
   savedMode = false,
@@ -533,92 +560,125 @@ export function ReadingPanels({
   locale: Locale;
   question: string;
   context?: ReadingContext | null;
-  aiText: string | null;
-  aiAvailable: boolean;
-  aiState: "idle" | "loading" | "error";
+  view: AnswerView;
   saveState?: "idle" | "saving" | "saved" | "error";
-  onInterpret?: () => void;
+  onRetry?: () => void;
   onSave?: () => void;
   onReset?: () => void;
   savedMode?: boolean;
   activePosition?: string | null;
 }) {
   const { t } = useI18n();
-  const reading = buildReading({ question, spreadId: spread.id, drawn, locale, context });
   const situation = contextLabel(spread.id, context, locale);
+  const library = view.kind === "fallback" || view.kind === "saved-kb"
+    ? buildReading({ question, spreadId: spread.id, drawn, locale, context })
+    : null;
 
   return (
-    <div className={cn("grid gap-6", savedMode ? "mt-10" : "mt-6 lg:mt-0")}>
-      <article className="rounded-3xl border border-primary/35 bg-card/70 p-5 sm:p-7" data-testid="reading-summary">
-        <h2 className="font-display text-2xl text-primary">{t.summaryTitle}</h2>
-        {situation ? (
-          <p className="mt-3 text-sm text-primary" data-testid="reading-context">
-            {situation}
-          </p>
-        ) : null}
-        <div className="mt-4 space-y-6">
-          {reading.synthesis.map((block) => (
-            <section key={block.id}>
-              <h3 className="text-lg text-primary">{block.heading}</h3>
-              <p className="mt-2 leading-8">{block.body}</p>
-            </section>
-          ))}
+    <div className={cn("grid gap-6", savedMode ? "mt-0" : "mt-6 lg:mt-0")}>
+      {view.kind === "loading" ? (
+        <div className="reading-wait" data-testid="reading-wait" aria-live="polite">
+          <p className="font-display text-2xl text-primary">{t.readingWait}</p>
+          <div className="reading-wait-dots" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">{t.disclaimerShort}</p>
-      </article>
+      ) : null}
 
-      {aiAvailable ? (
-        <article className="rounded-3xl border border-border bg-card/50 p-5 sm:p-7">
-          <h2 className="text-lg text-primary">{t.aiTitle}</h2>
-          {aiText ? <div className="mt-4 leading-8 whitespace-pre-wrap">{aiText}</div> : null}
-          <Button className="mt-4 h-11" onClick={onInterpret} disabled={aiState === "loading" || !onInterpret}>
-            {aiState === "loading" ? t.aiLoading : t.aiButton}
-          </Button>
-          {aiState === "error" ? <p className="mt-3 text-sm text-destructive">{t.aiError}</p> : null}
+      {view.kind === "ai" ? (
+        <AiAnswer
+          spread={spread}
+          drawn={drawn}
+          locale={locale}
+          reading={view.reading}
+          situation={situation}
+          activePosition={activePosition}
+          connectionTitle={t.connectionTitle}
+          conclusionTitle={t.conclusionTitle}
+          disclaimer={t.disclaimerShort}
+        />
+      ) : null}
+
+      {view.kind === "saved-prose" ? (
+        <article className="rounded-3xl border border-primary/35 bg-card/70 p-5 sm:p-7" data-testid="reading-answer">
+          {situation ? <p className="text-sm text-primary" data-testid="reading-context">{situation}</p> : null}
+          <p className="mt-4 leading-8 whitespace-pre-wrap">{view.text}</p>
+          <p className="mt-4 text-xs text-muted-foreground">{t.disclaimerShort}</p>
         </article>
       ) : null}
 
-      <section data-testid="reading-detail">
-        <h2 className="text-lg text-primary">{t.positionsTitle}</h2>
-        <div className="mt-4 grid gap-4">
-          {reading.chapters.map((chapter) => (
-            <article
-              key={chapter.positionId}
-              id={`pos-${chapter.positionId}`}
-              data-testid="reading-chapter"
-              className={cn(
-                "reading-chapter rounded-2xl border border-border bg-card/45 p-4 sm:p-5",
-                activePosition === chapter.positionId && "is-current",
-              )}
-            >
-              <p className="text-xs tracking-[0.2em] text-primary">{chapter.positionName}</p>
-              <h3 className="mt-1 text-xl">
-                {chapter.cardName}
-                <span className="ml-2 text-sm text-muted-foreground">{chapter.orientation}</span>
-              </h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {chapter.keywords.map((keyword) => (
-                  <span key={keyword} className="rounded-full border border-primary/40 px-2 py-0.5 text-xs text-primary">
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-4 space-y-4">
-                {chapter.blocks.map((block) => (
-                  <section key={block.id}>
-                    <h4 className="text-sm tracking-[0.14em] text-primary">{block.heading}</h4>
-                    <p className="mt-1 leading-8">{block.body}</p>
-                  </section>
-                ))}
-              </div>
-            </article>
-          ))}
+      {library ? (
+        <div data-testid={view.kind === "fallback" ? "reading-fallback" : "reading-saved"}>
+          {view.kind === "fallback" ? (
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <p className="text-sm text-muted-foreground" data-testid="fallback-note">
+                {view.reason === "RATE_LIMIT" ? t.aiRate : t.fallbackNote}
+              </p>
+              {onRetry ? (
+                <Button variant="outline" className="h-9" onClick={onRetry} data-testid="retry-reading">
+                  {t.retryReading}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          <article className="rounded-3xl border border-primary/35 bg-card/70 p-5 sm:p-7" data-testid="reading-summary">
+            <h2 className="font-display text-2xl text-primary">{t.summaryTitle}</h2>
+            {situation ? (
+              <p className="mt-3 text-sm text-primary" data-testid="reading-context">{situation}</p>
+            ) : null}
+            <div className="mt-4 space-y-6">
+              {library.synthesis.map((block) => (
+                <section key={block.id}>
+                  <h3 className="text-lg text-primary">{block.heading}</h3>
+                  <p className="mt-2 leading-8">{block.body}</p>
+                </section>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">{t.disclaimerShort}</p>
+          </article>
+          <section className="mt-6" data-testid="reading-detail">
+            <h2 className="text-lg text-primary">{t.positionsTitle}</h2>
+            <div className="mt-4 grid gap-4">
+              {library.chapters.map((chapter) => (
+                <article
+                  key={chapter.positionId}
+                  id={`pos-${chapter.positionId}`}
+                  data-testid="reading-chapter"
+                  className={cn(
+                    "reading-chapter rounded-2xl border border-border bg-card/45 p-4 sm:p-5",
+                    activePosition === chapter.positionId && "is-current",
+                  )}
+                >
+                  <p className="text-xs tracking-[0.2em] text-primary">{chapter.positionName}</p>
+                  <h3 className="mt-1 text-xl">
+                    {chapter.cardName}
+                    <span className="ml-2 text-sm text-muted-foreground">{chapter.orientation}</span>
+                  </h3>
+                  <div className="mt-4 space-y-4">
+                    {chapter.blocks.map((block) => (
+                      <section key={block.id}>
+                        <h4 className="text-sm tracking-[0.14em] text-primary">{block.heading}</h4>
+                        <p className="mt-1 leading-8">{block.body}</p>
+                      </section>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
-      </section>
+      ) : null}
 
       {savedMode ? null : (
         <div className="flex flex-wrap gap-3">
-          <Button className="h-11 px-6" onClick={onSave} disabled={saveState === "saving" || saveState === "saved"} data-testid="save-reading">
+          <Button
+            className="h-11 px-6"
+            onClick={onSave}
+            disabled={view.kind === "loading" || saveState === "saving" || saveState === "saved"}
+            data-testid="save-reading"
+          >
             {saveState === "saving" ? t.saving : saveState === "saved" ? t.saved : t.save}
           </Button>
           <Button variant="outline" className="h-11" onClick={onReset}>
@@ -635,60 +695,86 @@ export function ReadingPanels({
   );
 }
 
+function AiAnswer({
+  spread,
+  drawn,
+  locale,
+  reading,
+  situation,
+  activePosition,
+  connectionTitle,
+  conclusionTitle,
+  disclaimer,
+}: {
+  spread: Spread;
+  drawn: DrawnCard[];
+  locale: Locale;
+  reading: AiReading;
+  situation: string;
+  activePosition: string | null;
+  connectionTitle: string;
+  conclusionTitle: string;
+  disclaimer: string;
+}) {
+  return (
+    <div className="grid gap-4" data-testid="reading-answer">
+      {situation ? <p className="text-sm text-primary" data-testid="reading-context">{situation}</p> : null}
+      {reading.cards.map((section) => {
+        const position = spread.positions.find((item) => item.id === section.positionId);
+        const placement = drawn.find((item) => item.positionId === section.positionId);
+        const card = placement ? getCard(placement.cardId) : undefined;
+        const orient = placement?.reversed ? (locale === "zh" ? "逆位" : "reversed") : locale === "zh" ? "正位" : "upright";
+        return (
+          <article
+            key={section.positionId}
+            id={`pos-${section.positionId}`}
+            data-testid="reading-chapter"
+            className={cn(
+              "reading-chapter rounded-2xl border border-border bg-card/45 p-4 sm:p-5",
+              activePosition === section.positionId && "is-current",
+            )}
+          >
+            <p className="text-xs tracking-[0.2em] text-primary">{position?.name[locale] ?? section.positionId}</p>
+            <h3 className="mt-1 text-xl">
+              {card?.name[locale] ?? section.positionId}
+              <span className="ml-2 text-sm text-muted-foreground">{orient}</span>
+            </h3>
+            <p className="mt-3 leading-8">{section.body}</p>
+          </article>
+        );
+      })}
+      <section className="rounded-2xl border border-primary/30 bg-card/60 p-4 sm:p-5" data-testid="reading-connection">
+        <h3 className="text-lg text-primary">{connectionTitle}</h3>
+        <p className="mt-2 leading-8">{reading.connection}</p>
+      </section>
+      <section className="rounded-2xl border border-primary/30 bg-card/60 p-4 sm:p-5" data-testid="reading-conclusion">
+        <h3 className="text-lg text-primary">{conclusionTitle}</h3>
+        <p className="mt-2 leading-8">{reading.conclusion}</p>
+      </section>
+      <p className="text-xs text-muted-foreground">{disclaimer}</p>
+    </div>
+  );
+}
+
 export function SavedReading({ reading }: { reading: ReadingRecord }) {
   const { locale, t } = useI18n();
   const { user } = useAuth();
   const spread = getSpread(reading.spreadId);
-  const [aiText, setAiText] = useState(reading.aiInterpretation);
-  const [aiAvailable, setAiAvailable] = useState(false);
-  const [aiState, setAiState] = useState<"idle" | "loading" | "error">("idle");
-
-  useEffect(() => {
-    void fetch("/api/interpret", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { available?: boolean }) => setAiAvailable(Boolean(data.available)))
-      .catch(() => setAiAvailable(false));
-  }, []);
+  const [activePosition, setActivePosition] = useState<string | null>(null);
 
   if (!spread) return <p className="px-4 py-16 text-muted-foreground">{t.historyMissing}</p>;
 
   const placements: Placement[] = reading.cards.map((card) => ({ ...card, revealed: true }));
-
-  async function interpret() {
-    setAiState("loading");
-    try {
-      const response = await fetch("/api/interpret", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: reading.question,
-          spreadId: reading.spreadId,
-          locale,
-          cards: reading.cards,
-          context: reading.context,
-        }),
-      });
-      const data = (await response.json()) as { interpretation?: string; error?: string };
-      if (!response.ok || !data.interpretation) {
-        setAiState("error");
-        toast.error(errorText(data.error ?? "", t));
-        return;
-      }
-      setAiText(data.interpretation);
-      setAiState("idle");
-      if (user) {
-        await fetch(`/api/readings/${reading.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ aiInterpretation: data.interpretation }),
-        });
-      } else {
-        upsertGuestReading({ ...reading, aiInterpretation: data.interpretation });
-      }
-    } catch {
-      setAiState("error");
-    }
-  }
+  const stored = readStoredAnswer(
+    reading.aiInterpretation,
+    spread.positions.map((position) => ({ id: position.id, names: [position.name.zh, position.name.en] })),
+  );
+  const view: AnswerView =
+    stored.kind === "structured"
+      ? { kind: "ai", reading: stored.reading }
+      : stored.kind === "prose"
+        ? { kind: "saved-prose", text: stored.text }
+        : { kind: "saved-kb" };
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -697,31 +783,34 @@ export function SavedReading({ reading }: { reading: ReadingRecord }) {
       </Link>
       <h1 className="mt-3 text-3xl text-primary">{spread.name[locale]}</h1>
       {reading.question ? <p className="mt-3 text-lg leading-8">「{reading.question}」</p> : <p className="mt-3 text-muted-foreground">{t.noQuestion}</p>}
-      {contextLabel(reading.spreadId, reading.context, locale) ? (
-        <p className="mt-2 text-sm text-primary">{contextLabel(reading.spreadId, reading.context, locale)}</p>
-      ) : null}
-      <SpreadTable
-        spread={spread}
-        placements={placements}
-        locale={locale}
-        upright={t.upright}
-        reversed={t.reversed}
-        onActivate={(positionId) => {
-          document.getElementById(`pos-${positionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }}
-      />
-      <ReadingPanels
-        spread={spread}
-        drawn={reading.cards}
-        locale={locale}
-        question={reading.question}
-        context={reading.context}
-        aiText={aiText}
-        aiAvailable={aiAvailable}
-        aiState={aiState}
-        onInterpret={() => void interpret()}
-        savedMode
-      />
+      <div className="reading-layout is-split">
+        <div className="reading-board">
+          <SpreadTable
+            spread={spread}
+            placements={placements}
+            locale={locale}
+            upright={t.upright}
+            reversed={t.reversed}
+            className="spread mt-3"
+            onActivate={(positionId) => {
+              setActivePosition(positionId);
+              document.getElementById(`pos-${positionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
+        </div>
+        <div className="reading-interpret">
+          <ReadingPanels
+            spread={spread}
+            drawn={reading.cards}
+            locale={locale}
+            question={reading.question}
+            context={reading.context}
+            view={view}
+            activePosition={activePosition}
+            savedMode
+          />
+        </div>
+      </div>
       <DeleteReading id={reading.id} ownedByAccount={Boolean(user)} />
     </div>
   );

@@ -26,7 +26,7 @@ const schema = z.object({
       theme: z.string().max(40).optional(),
     })
     .optional(),
-  aiInterpretation: z.string().max(8000).nullable().optional(),
+  aiInterpretation: z.string().max(24000).nullable().optional(),
 });
 
 export async function GET() {

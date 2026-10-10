@@ -1,8 +1,12 @@
-import { requireCard, type Locale } from "./cards";
+import { parseAiReading, type AiReading } from "./ai-reading";
+import type { Locale } from "./cards";
 import { contextLabel, contextTopic, type ReadingContext } from "./reading-context";
 import type { Spread } from "./spreads";
 import type { DrawnCard } from "./shuffle";
-import { orientation } from "./summary";
+import { orientation, positionMeaning, readingLines, synthesisSignals } from "./summary";
+
+/** Every reveal calls Gemini, so allow a full evening of readings and retries, then fall back to the library. */
+export const INTERPRET_HOURLY_LIMIT = 30;
 
 /** Fast Chinese-capable flash model. Override with GEMINI_MODEL. */
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
@@ -18,7 +22,7 @@ export type GeminiFailReason = "timeout" | "upstream" | "empty";
 
 export type GeminiFailure = { error: "AI_FAILED"; reason: GeminiFailReason };
 
-export type GeminiSuccess = { interpretation: string };
+export type GeminiSuccess = { reading: AiReading };
 
 type GeminiPart = {
   text?: unknown;
@@ -64,12 +68,35 @@ export function isGeminiTimeout(error: unknown): boolean {
 }
 
 type CardBrief = {
+  positionId: string;
   position: string;
   place: string;
   card: string;
   orientation: string;
   keywords: string;
-  meaning: string;
+  topicMeaning: string;
+  inPosition: string;
+  advice: string;
+};
+
+const responseSchema = {
+  type: "OBJECT",
+  properties: {
+    cards: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          positionId: { type: "STRING" },
+          body: { type: "STRING" },
+        },
+        required: ["positionId", "body"],
+      },
+    },
+    connection: { type: "STRING" },
+    conclusion: { type: "STRING" },
+  },
+  required: ["cards", "connection", "conclusion"],
 };
 
 export function geminiReadingBody(input: {
@@ -78,33 +105,39 @@ export function geminiReadingBody(input: {
   locale: Locale;
   context: ReadingContext;
   cards: DrawnCard[];
-}): { system: string; user: { question: string; spread: string; situation: string; cards: CardBrief[] } } {
+}): {
+  system: string;
+  user: { question: string; spread: string; situation: string; signals: string; cards: CardBrief[] };
+} {
   const { question, spread, locale, context, cards } = input;
   const topic = contextTopic(spread.id, context);
   const situation = contextLabel(spread.id, context, locale);
-  const briefs: CardBrief[] = cards.map((drawn) => {
-    const card = requireCard(drawn.cardId);
-    const position = spread.positions.find((item) => item.id === drawn.positionId);
-    const orient = drawn.reversed ? "reversed" : "upright";
+  const lines = readingLines(spread, cards);
+  const briefs: CardBrief[] = lines.map((line) => {
+    const orient = line.reversed ? "reversed" : "upright";
     return {
-      position: position?.name[locale] ?? drawn.positionId,
-      place: position?.description[locale] ?? "",
-      card: card.name[locale],
-      orientation: orientation(drawn.reversed, locale),
-      keywords: card.keywords[locale].join(locale === "zh" ? "、" : ", "),
-      meaning: card.topics[orient][topic][locale],
+      positionId: line.position.id,
+      position: line.position.name[locale],
+      place: line.position.description[locale],
+      card: line.card.name[locale],
+      orientation: orientation(line.reversed, locale),
+      keywords: line.card.keywords[locale].join(locale === "zh" ? "、" : ", "),
+      topicMeaning: line.card.topics[orient][topic][locale],
+      inPosition: positionMeaning(line, locale, spread.id, context),
+      advice: line.card.topics[orient].advice[locale],
     };
   });
   const system =
     locale === "zh"
-      ? "你是叨叨占卜师，温和、具体、不吓唬人。用简体中文写 3 到 5 段。结合提问、处境，以及每张牌的名称、正逆位和位置，把牌义说成对这个人有用的话。处境优先：已婚或同居不要写成要不要开始约会，求职中不要写成已经坐在那份工作里，学生不要写成公司升职流程。不要断言医疗、法律、财务或绝对的未来，不要发明没有的牌。结尾一句提醒这只是娱乐与自我反思。"
-      : "You are Daodao, a warm and specific tarot reader. Write 3 to 5 paragraphs in English from the question, the situation, and each card's name, orientation, and position. Let the situation override a generic reading: do not tell a married person to start dating, do not treat a job seeker as someone already in the role, and do not give a student a corporate promotion process. Do not claim medical, legal, financial, or absolute future facts. Do not invent cards. Close with one sentence that this is entertainment and reflection.";
+      ? "你是叨叨占卜师。只根据给出的知识库文字来解牌，不要另起一套牌义，不要发明没有的牌。用简体中文。每张牌写两到四句，放在它的位置里，并尊重问卜者确认的处境：已婚或同居不要写成要不要开始约会，求职中不要写成已经坐在那份工作里，学生不要写成公司升职流程。connection 写牌与牌如何呼应，用上给出的牌阵信号。conclusion 回到问题和处境，给出一件具体可做的事。不要断言医疗、法律、财务或绝对的未来。只返回符合结构的 JSON，positionId 必须原样使用。"
+      : "You are Daodao. Base the reading only on the supplied knowledge-base texts. Do not invent meanings or cards. Write in English. For each card, two to four sentences in its position, and honor the stated situation: do not tell a married person to start dating, do not treat a job seeker as someone already in the role, and do not give a student a corporate promotion process. connection describes how the cards answer one another, using the synthesis signals. conclusion returns to the question and the situation with one concrete next step. Do not claim medical, legal, financial, or absolute future facts. Return only the JSON object, and copy positionId exactly.";
   return {
     system,
     user: {
       question,
       spread: spread.name[locale],
       situation,
+      signals: synthesisSignals(spread.id, cards, locale),
       cards: briefs,
     },
   };
@@ -115,6 +148,7 @@ export async function requestGeminiInterpretation(input: {
   model: string;
   system: string;
   user: unknown;
+  positions: { id: string; names: string[] }[];
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
 }): Promise<GeminiSuccess | GeminiFailure> {
@@ -133,7 +167,9 @@ export async function requestGeminiInterpretation(input: {
           systemInstruction: { parts: [{ text: input.system }] },
           contents: [{ role: "user", parts: [{ text: JSON.stringify(input.user) }] }],
           generationConfig: {
-            temperature: 0.8,
+            temperature: 0.7,
+            responseMimeType: "application/json",
+            responseSchema,
             thinkingConfig: thinkingConfigFor(input.model),
           },
         }),
@@ -146,8 +182,9 @@ export async function requestGeminiInterpretation(input: {
     }
     const payload = (await response.json()) as GeminiPayload;
     const text = candidateText(payload.candidates?.[0]?.content?.parts);
-    if (!text) return { error: "AI_FAILED", reason: "empty" };
-    return { interpretation: text };
+    const reading = text ? parseAiReading(text, input.positions) : null;
+    if (!reading) return { error: "AI_FAILED", reason: "empty" };
+    return { reading };
   } catch (error) {
     return { error: "AI_FAILED", reason: isGeminiTimeout(error) ? "timeout" : "upstream" };
   }

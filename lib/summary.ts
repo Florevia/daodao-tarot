@@ -540,3 +540,10 @@ export function buildSummary(input: {
 }): string {
   return buildReading(input).text;
 }
+
+/** Compact knowledge-base signals: arcana mix, leading suit, reversals, and notable pairs. */
+export function synthesisSignals(spreadId: string, drawn: DrawnCard[], locale: Locale): string {
+  const spread = getSpread(spreadId);
+  if (!spread) return "";
+  return themeBlock(readingLines(spread, drawn), locale);
+}

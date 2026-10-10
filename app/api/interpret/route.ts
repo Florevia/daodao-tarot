@@ -1,4 +1,5 @@
 import {
+  INTERPRET_HOURLY_LIMIT,
   geminiApiKey,
   geminiModel,
   geminiReadingBody,
@@ -49,7 +50,7 @@ function limited(request: Request): boolean {
     return false;
   }
   current.count += 1;
-  return current.count > 20;
+  return current.count > INTERPRET_HOURLY_LIMIT;
 }
 
 export async function GET() {
@@ -84,7 +85,11 @@ export async function POST(request: Request) {
     model: geminiModel(),
     system,
     user,
+    positions: spread.positions.map((position) => ({
+      id: position.id,
+      names: [position.name.zh, position.name.en],
+    })),
   });
-  if ("interpretation" in result) return Response.json(result);
+  if ("reading" in result) return Response.json(result);
   return Response.json(result, { status: 502 });
 }
