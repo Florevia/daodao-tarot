@@ -17,6 +17,7 @@ import { usePathname, useRouter } from "next/navigation";
 const links = [
   { href: "/reading", key: "navRead" },
   { href: "/cards", key: "navCards" },
+  { href: "/cases", key: "navCases" },
   { href: "/history", key: "navHistory" },
 ] as const;
 

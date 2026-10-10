@@ -51,6 +51,8 @@ describe("gemini", () => {
     assert.match(system, /简体中文/);
     assert.match(system, /不要断言医疗、法律、财务或绝对的未来/);
     assert.match(system, /不要出现「仅供娱乐」/);
+    assert.match(system, /examples 只是风格和深度的参照/);
+    assert.match(system, /不要照抄例子/);
     assert.doesNotMatch(system, /以仅供娱乐收尾|close with an entertainment/);
     const english = geminiReadingBody({
       question: "How does this marriage continue?",
@@ -61,7 +63,11 @@ describe("gemini", () => {
     });
     assert.match(english.system, /Do not claim medical, legal, financial, or absolute future facts/);
     assert.match(english.system, /do not close with that kind of line/);
+    assert.match(english.system, /do not copy the examples/);
     assert.doesNotMatch(english.system, /close with an entertainment and reflection sentence/);
+    assert.ok(user.examples.items.length >= 2 && user.examples.items.length <= 3);
+    assert.ok(user.examples.items.every((item) => item.id.startsWith("love-")));
+    assert.ok(JSON.stringify(user.examples).length < 3800);
     assert.equal(user.situation, "已婚或同居 · 关系走向");
     assert.equal(user.cards.length, 6);
     assert.match(user.signals, /阿卡纳|逆位/);

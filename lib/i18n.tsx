@@ -7,6 +7,7 @@ const zh = {
   brandEn: "Daodao Tarot",
   navRead: "占卜",
   navCards: "牌义",
+  navCases: "案例",
   navHistory: "记录",
   navAccount: "账号",
   login: "登录",
@@ -160,6 +161,12 @@ const zh = {
   readingEyebrow: "一次占卜",
   backToHistory: "返回记录",
   spreadCards: "张牌",
+  casesTitle: "占卜案例",
+  casesLead: "一百个写成文字的例子，用来对照解牌可以具体到什么程度。你自己的牌仍按知识库来读，不会照抄这里。",
+  casesLangNote: "案例为简体中文。",
+  casesBack: "返回案例",
+  casesAll: "全部",
+  casesCount: "个",
 };
 
 const en: { [K in keyof typeof zh]: string } = {
@@ -167,6 +174,7 @@ const en: { [K in keyof typeof zh]: string } = {
   brandEn: "Daodao Tarot",
   navRead: "Reading",
   navCards: "Cards",
+  navCases: "Cases",
   navHistory: "History",
   navAccount: "Account",
   login: "Log in",
@@ -320,6 +328,12 @@ const en: { [K in keyof typeof zh]: string } = {
   readingEyebrow: "A reading",
   backToHistory: "Back to history",
   spreadCards: "cards",
+  casesTitle: "Reading cases",
+  casesLead: "One hundred written examples, so a reading can be this specific. Your own cards are still read from the knowledge base, not copied from here.",
+  casesLangNote: "The cases are written in Simplified Chinese.",
+  casesBack: "Back to cases",
+  casesAll: "All",
+  casesCount: "cases",
 };
 
 export type Messages = typeof zh;

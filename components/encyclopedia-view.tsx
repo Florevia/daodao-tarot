@@ -45,6 +45,11 @@ export function EncyclopediaView() {
       <p className="font-display text-xs tracking-[0.35em] text-primary">78</p>
       <h1 className="mt-2 text-4xl text-primary">{t.encyclopediaTitle}</h1>
       <p className="mt-3 max-w-2xl leading-8 text-muted-foreground">{t.encyclopediaLead}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        <Link href="/cases" className="text-primary hover:underline">
+          {t.casesTitle}
+        </Link>
+      </p>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
           value={query}
