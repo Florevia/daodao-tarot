@@ -37,7 +37,7 @@ export const wandsTopics: Record<string, { upright: DomainCopy; reversed: Domain
       L("今天跟进一件你已经发出去的事，问它到了哪，并准备接住回复。", "Today follow one thing you have already sent. Ask where it is, and be ready to receive the reply."),
     ),
     reversed: domains(
-      L("逆位的权杖三是扩展受阻、缺乏前瞻，或你在等一个不会自己靠岸的结果。感情里，延迟和受挫的计划是这张牌，不是三角关系。检查船有没有真的离开港口。", "Reversed, the Three of Wands is expansion blocked, a lack of foresight, or waiting for a result that will not dock by itself. In love this is delay and a frustrated plan, not a triangle. Check whether the ship actually left the harbor."),
+      L("逆位的权杖三是扩展受阻、缺乏前瞻，或你在等一个不会自己靠岸的结果。感情里，这是延迟和受挫的计划。检查船有没有真的离开港口。", "Reversed, the Three of Wands is expansion blocked, a lack of foresight, or waiting for a result that will not dock by itself. In love this is delay and a frustrated plan. Check whether the ship actually left the harbor."),
       L("工作上，远航停在纸上，回音迟迟不来，或你没把下一步看进地图。要么重新发船，要么承认这次还没出发。", "At work the voyage is still on paper, the reply is late, or you never put the next step on the map. Either launch again, or admit this one has not left."),
       L("等待会变成焦躁，身体跟着紧。金钱上，别为还在港口里的计划提前花掉回程的钱。", "Waiting becomes restlessness, and the body tightens. With money, do not spend the return fare on a plan that is still in the harbor."),
       L("核对一件你以为已经在路上的事。如果它没出发，今天补上真正的发送；如果只是延迟，就改一个你能等的日期。", "Check one thing you thought was already on the way. If it never left, send it for real today. If it is only delayed, change the date to one you can wait for."),
