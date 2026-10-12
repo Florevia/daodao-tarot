@@ -1,6 +1,8 @@
 import { parseAiReading, type AiReading } from "./ai-reading";
 import type { Locale } from "./cards";
 import { exampleLabel, examplesForPrompt, selectExampleCases, type PromptExample } from "./cases";
+import { repairReading } from "./prompt/checks";
+import { selfReviewPrompt, type SelfReviewContext } from "./prompt/compose";
 import { contextLabel, contextTopic, type ReadingContext } from "./reading-context";
 import type { Spread } from "./spreads";
 import type { DrawnCard } from "./shuffle";
@@ -12,8 +14,16 @@ export const INTERPRET_HOURLY_LIMIT = 30;
 /** Current flash model that still accepts new keys and handles Chinese. Override with GEMINI_MODEL. */
 export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 
-/** Tried, in order, when the chosen model is missing, overloaded, or rate-limited. */
-export const GEMINI_FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"] as const;
+/**
+ * Tried after the primary model. A 429 is that model's quota and the chain
+ * continues. The same non-quota failure twice stops the chain.
+ */
+export const GEMINI_FALLBACK_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-lite-latest",
+  "gemini-3.5-flash-lite",
+] as const;
 
 /**
  * Multi-card readings were exceeding the old 30s abort. 90s stays under
@@ -22,7 +32,7 @@ export const GEMINI_FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"
  */
 export const GEMINI_TIMEOUT_MS = 90_000;
 
-export type GeminiFailReason = "timeout" | "upstream" | "empty";
+export type GeminiFailReason = "timeout" | "upstream" | "empty" | "quota";
 
 export type GeminiFailure = { error: "AI_FAILED"; reason: GeminiFailReason };
 
@@ -66,7 +76,7 @@ export function thinkingConfigFor(model: string): { thinkingBudget: number } | {
 }
 
 function modelUnavailable(status: number, body: string): boolean {
-  if (status === 404 || status === 429 || status === 503) return true;
+  if (status === 404 || status === 503) return true;
   if (status !== 400) return false;
   return /model|thinking|no longer available|not supported|not found/i.test(body);
 }
@@ -98,7 +108,8 @@ type CardBrief = {
   advice: string;
 };
 
-const responseSchema = {
+/** Schema used by the prompt that shipped before the skill bundle. */
+export const legacyResponseSchema = {
   type: "OBJECT",
   properties: {
     cards: {
@@ -116,6 +127,15 @@ const responseSchema = {
     conclusion: { type: "STRING" },
   },
   required: ["cards", "connection", "conclusion"],
+};
+
+export const readingResponseSchema = {
+  type: "OBJECT",
+  properties: {
+    overview: { type: "STRING" },
+    ...legacyResponseSchema.properties,
+  },
+  required: ["overview", "cards", "connection", "conclusion"],
 };
 
 export function geminiReadingBody(input: {
@@ -177,6 +197,58 @@ export function geminiReadingBody(input: {
   };
 }
 
+export function generateContentRequest(input: {
+  model: string;
+  system: string;
+  user: unknown;
+  schema?: typeof legacyResponseSchema | typeof readingResponseSchema;
+}): { model: string; request: Record<string, unknown> } {
+  return {
+    model: input.model,
+    request: {
+      systemInstruction: { parts: [{ text: input.system }] },
+      contents: [{ role: "user", parts: [{ text: JSON.stringify(input.user) }] }],
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: "application/json",
+        responseSchema: input.schema ?? readingResponseSchema,
+        thinkingConfig: thinkingConfigFor(input.model),
+      },
+    },
+  };
+}
+
+export function selfReviewTemplate(model = DEFAULT_GEMINI_MODEL): { model: string; request: Record<string, unknown> } {
+  const draft = {
+    overview: "<<FIRST_RESPONSE_OVERVIEW>>",
+    cards: [{ positionId: "<<POSITION_ID>>", body: "<<FIRST_RESPONSE_BODY>>" }],
+    connection: "<<FIRST_RESPONSE_CONNECTION>>",
+    conclusion: "<<FIRST_RESPONSE_CONCLUSION>>",
+  };
+  const review = selfReviewPrompt(draft, "zh", {
+    question: "<<QUESTION>>",
+    situation: "<<SITUATION>>",
+    spread: "<<SPREAD>>",
+    positions: [{ id: "<<POSITION_ID>>", name: "<<POSITION_NAME>>", asks: "<<POSITION_ASKS>>" }],
+    cards: [
+      {
+        positionId: "<<POSITION_ID>>",
+        card: "<<CARD_NAME>>",
+        orientation: "<<ORIENTATION>>",
+        keywords: "<<KEYWORDS>>",
+        meaning: "<<KNOWLEDGE_BASE_MEANING>>",
+      },
+    ],
+    crisis: false,
+  });
+  return generateContentRequest({
+    model,
+    system: review.system,
+    user: review.user,
+    schema: readingResponseSchema,
+  });
+}
+
 export async function requestGeminiInterpretation(input: {
   apiKey: string;
   model: string;
@@ -185,13 +257,18 @@ export async function requestGeminiInterpretation(input: {
   positions: { id: string; names: string[] }[];
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  schema?: typeof legacyResponseSchema | typeof readingResponseSchema;
+  selfReview?: boolean;
+  locale?: Locale;
+  reviewContext?: SelfReviewContext;
 }): Promise<GeminiSuccess | GeminiFailure> {
   const timeoutMs = input.timeoutMs ?? GEMINI_TIMEOUT_MS;
   const fetchImpl = input.fetchImpl ?? fetch;
   const signal = AbortSignal.timeout(timeoutMs);
   const chain = geminiModelChain(input.model);
-  for (const model of chain) {
-    if (signal.aborted) return { error: "AI_FAILED", reason: "timeout" };
+  const schema = input.schema ?? readingResponseSchema;
+
+  const once = async (model: string, system: string, user: unknown): Promise<GeminiSuccess | GeminiFailure | "unavailable"> => {
     try {
       const response = await fetchImpl(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -201,23 +278,18 @@ export async function requestGeminiInterpretation(input: {
             "Content-Type": "application/json",
             "x-goog-api-key": input.apiKey,
           },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: input.system }] },
-            contents: [{ role: "user", parts: [{ text: JSON.stringify(input.user) }] }],
-            generationConfig: {
-              temperature: 0.7,
-              responseMimeType: "application/json",
-              responseSchema,
-              thinkingConfig: thinkingConfigFor(model),
-            },
-          }),
+          body: JSON.stringify(generateContentRequest({ model, system, user, schema }).request),
           signal,
         },
       );
+      if (response.status === 429) {
+        await response.body?.cancel().catch(() => undefined);
+        return { error: "AI_FAILED", reason: "quota" };
+      }
       if (!response.ok) {
         const body = response.status === 400 ? await response.text().catch(() => "") : "";
         if (response.status !== 400) await response.body?.cancel().catch(() => undefined);
-        if (modelUnavailable(response.status, body)) continue;
+        if (modelUnavailable(response.status, body)) return "unavailable";
         return { error: "AI_FAILED", reason: "upstream" };
       }
       const payload = (await response.json()) as GeminiPayload;
@@ -228,6 +300,47 @@ export async function requestGeminiInterpretation(input: {
     } catch (error) {
       return { error: "AI_FAILED", reason: isGeminiTimeout(error) || signal.aborted ? "timeout" : "upstream" };
     }
+  };
+
+  let first: GeminiSuccess | null = null;
+  let usedModel = input.model;
+  let sawQuota = false;
+  let lastFailure: GeminiFailReason | null = null;
+  const seenFailures = new Set<GeminiFailReason>();
+  for (const model of chain) {
+    if (signal.aborted) return { error: "AI_FAILED", reason: "timeout" };
+    const result = await once(model, input.system, input.user);
+    if (result === "unavailable") continue;
+    if ("error" in result) {
+      if (result.reason === "timeout") return result;
+      if (result.reason === "quota") {
+        sawQuota = true;
+        continue;
+      }
+      if (seenFailures.has(result.reason)) return result;
+      seenFailures.add(result.reason);
+      lastFailure = result.reason;
+      continue;
+    }
+    first = result;
+    usedModel = model;
+    break;
   }
-  return { error: "AI_FAILED", reason: "upstream" };
+  if (!first) {
+    if (lastFailure) return { error: "AI_FAILED", reason: lastFailure };
+    if (sawQuota) return { error: "AI_FAILED", reason: "quota" };
+    return { error: "AI_FAILED", reason: "upstream" };
+  }
+  const repaired = await repairReading(first.reading, signal, async (note) => {
+    if (signal.aborted) return null;
+    const revised = await once(usedModel, `${input.system}\n\n${note}`, input.user);
+    if (typeof revised !== "object" || !("reading" in revised)) return null;
+    return revised.reading;
+  });
+  first = { reading: repaired };
+  if (!input.selfReview || signal.aborted || !input.reviewContext) return first;
+  const review = selfReviewPrompt(first.reading, input.locale ?? "zh", input.reviewContext);
+  const revised = await once(usedModel, review.system, review.user);
+  if (revised !== "unavailable" && "reading" in revised) return revised;
+  return first;
 }

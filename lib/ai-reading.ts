@@ -4,6 +4,7 @@ export type AiCardSection = {
 };
 
 export type AiReading = {
+  overview?: string;
   cards: AiCardSection[];
   connection: string;
   conclusion: string;
@@ -36,6 +37,7 @@ export function parseAiReading(raw: string, positions: PositionAlias[]): AiReadi
   if (!record) return null;
   const connection = typeof record.connection === "string" ? record.connection.trim() : "";
   const conclusion = typeof record.conclusion === "string" ? record.conclusion.trim() : "";
+  const overview = typeof record.overview === "string" ? record.overview.trim() : "";
   if (!connection || !conclusion || !Array.isArray(record.cards)) return null;
   const byKey = new Map<string, string>();
   for (const item of record.cards) {
@@ -50,6 +52,7 @@ export function parseAiReading(raw: string, positions: PositionAlias[]): AiReadi
   }
   if (positions.some((position) => !byKey.has(position.id))) return null;
   return {
+    ...(overview ? { overview } : {}),
     cards: positions.map((position) => ({ positionId: position.id, body: byKey.get(position.id) ?? "" })),
     connection,
     conclusion,

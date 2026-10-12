@@ -1,10 +1,8 @@
-import {
-  INTERPRET_HOURLY_LIMIT,
-  geminiApiKey,
-  geminiModel,
-  geminiReadingBody,
-  requestGeminiInterpretation,
-} from "@/lib/gemini";
+import { resolveAiProvider, requestAiInterpretation } from "@/lib/ai-provider";
+import { INTERPRET_HOURLY_LIMIT, readingResponseSchema } from "@/lib/gemini";
+import { composeReadingPrompt, reviewContextFrom, selfReviewEnabled } from "@/lib/prompt/compose";
+import { buildCrisisReading } from "@/lib/prompt/crisis";
+import { detectQuestionKind } from "@/lib/prompt/detect";
 import { sanitizeContext } from "@/lib/reading-context";
 import { validateDrawnCards } from "@/lib/reading-record";
 import { getSpread } from "@/lib/spreads";
@@ -12,7 +10,7 @@ import type { DrawnCard } from "@/lib/shuffle";
 import { connection } from "next/server";
 import { z } from "zod";
 
-/** Above the 90s Gemini fetch, under the 300s Vercel hobby ceiling. */
+/** Above the 90s model fetch, under the 300s Vercel hobby ceiling. */
 export const maxDuration = 120;
 
 const cardSchema = z.object({
@@ -55,14 +53,12 @@ function limited(request: Request): boolean {
 
 export async function GET() {
   await connection();
-  return Response.json({ available: Boolean(geminiApiKey()) });
+  const provider = resolveAiProvider();
+  return Response.json({ available: Boolean(provider), provider: provider?.id ?? null });
 }
 
 export async function POST(request: Request) {
   await connection();
-  const key = geminiApiKey();
-  if (!key) return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
-  if (limited(request)) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
   const body = await request.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success || !validateDrawnCards(parsed.data.spreadId, parsed.data.cards)) {
@@ -73,22 +69,31 @@ export async function POST(request: Request) {
   const locale = parsed.data.locale;
   const context = sanitizeContext(parsed.data.spreadId, parsed.data.context);
   const question = parsed.data.question?.trim() || (locale === "zh" ? "（没有写下具体问题）" : "(no specific question)");
-  const { system, user } = geminiReadingBody({
+  if (detectQuestionKind(question) === "crisis") {
+    return Response.json({ reading: buildCrisisReading(spread.positions, locale) });
+  }
+  const provider = resolveAiProvider();
+  if (!provider) return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
+  if (limited(request)) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
+  const composed = composeReadingPrompt({
     question,
     spread,
     locale,
     context,
     cards: parsed.data.cards as DrawnCard[],
   });
-  const result = await requestGeminiInterpretation({
-    apiKey: key,
-    model: geminiModel(),
-    system,
-    user,
+  const result = await requestAiInterpretation({
+    provider,
+    system: composed.system,
+    user: composed.user,
     positions: spread.positions.map((position) => ({
       id: position.id,
       names: [position.name.zh, position.name.en],
     })),
+    schema: readingResponseSchema,
+    selfReview: selfReviewEnabled(),
+    locale,
+    reviewContext: reviewContextFrom(composed, spread, locale),
   });
   if ("reading" in result) return Response.json(result);
   return Response.json(result, { status: 502 });

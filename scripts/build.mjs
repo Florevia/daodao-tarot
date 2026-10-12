@@ -40,6 +40,7 @@ const generateEnv = {
   DATABASE_URL: databaseUrl || placeholderUrl,
 };
 
+run("npx", ["tsx", "scripts/bundle-prompts.ts"], process.env);
 run("prisma", ["generate"], generateEnv);
 
 if (migrateUrl) {
