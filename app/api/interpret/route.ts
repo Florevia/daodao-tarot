@@ -1,5 +1,9 @@
 import { resolveAiProvider, requestAiInterpretation } from "@/lib/ai-provider";
-import { INTERPRET_HOURLY_LIMIT, readingResponseSchema } from "@/lib/gemini";
+import { readSession } from "@/lib/auth";
+import { readingResponseSchema, type GeminiFailReason } from "@/lib/gemini";
+import { recordInterpret, type InterpretOutcome } from "@/lib/interpret-log";
+import { clientIp, consumeAiQuota, deviceIdFrom, guestKey, prismaCounterStore } from "@/lib/limits";
+import { loadExhaustedModels, markModelExhausted } from "@/lib/model-quota";
 import { composeReadingPrompt, reviewContextFrom, selfReviewEnabled } from "@/lib/prompt/compose";
 import { buildCrisisReading } from "@/lib/prompt/crisis";
 import { detectQuestionKind } from "@/lib/prompt/detect";
@@ -37,18 +41,10 @@ const schema = z.object({
   context: contextSchema,
 });
 
-const hits = new Map<string, { count: number; reset: number }>();
-
-function limited(request: Request): boolean {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const now = Date.now();
-  const current = hits.get(ip);
-  if (!current || current.reset < now) {
-    hits.set(ip, { count: 1, reset: now + 60 * 60 * 1000 });
-    return false;
-  }
-  current.count += 1;
-  return current.count > INTERPRET_HOURLY_LIMIT;
+function failureOutcome(reason: GeminiFailReason): InterpretOutcome {
+  if (reason === "quota") return "quota";
+  if (reason === "timeout") return "timeout";
+  return "error";
 }
 
 export async function GET() {
@@ -59,6 +55,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   await connection();
+  const started = Date.now();
   const body = await request.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success || !validateDrawnCards(parsed.data.spreadId, parsed.data.cards)) {
@@ -69,12 +66,65 @@ export async function POST(request: Request) {
   const locale = parsed.data.locale;
   const context = sanitizeContext(parsed.data.spreadId, parsed.data.context);
   const question = parsed.data.question?.trim() || (locale === "zh" ? "（没有写下具体问题）" : "(no specific question)");
+  const who = await readSession().catch(() => null);
+  const identity = guestKey(clientIp(request), deviceIdFrom(request));
+  const baseLog = {
+    userId: who?.id ?? null,
+    userEmail: who?.email ?? null,
+    guestKey: who ? null : identity,
+    question,
+    spreadId: spread.id,
+    contextJson: JSON.stringify(context),
+    cardsJson: JSON.stringify(parsed.data.cards),
+  };
+
   if (detectQuestionKind(question) === "crisis") {
-    return Response.json({ reading: buildCrisisReading(spread.positions, locale) });
+    const reading = buildCrisisReading(spread.positions, locale);
+    await recordInterpret({
+      ...baseLog,
+      readingJson: JSON.stringify(reading),
+      latencyMs: Date.now() - started,
+      outcome: "crisis",
+    });
+    return Response.json({ reading });
   }
+
   const provider = resolveAiProvider();
-  if (!provider) return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
-  if (limited(request)) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
+  if (!provider) {
+    await recordInterpret({
+      ...baseLog,
+      latencyMs: Date.now() - started,
+      outcome: "fallback",
+      errorReason: "no-provider",
+    });
+    return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
+  }
+
+  let quota: "ok" | "user" | "site" = "user";
+  try {
+    quota = await consumeAiQuota(prismaCounterStore(), identity);
+  } catch (error) {
+    await recordInterpret({
+      ...baseLog,
+      provider: provider.id,
+      latencyMs: Date.now() - started,
+      outcome: "error",
+      errorReason: error instanceof Error ? error.message : "limit-check",
+    });
+    return Response.json({ error: "RATE_LIMIT", reason: "rate-limited" }, { status: 429 });
+  }
+  if (quota !== "ok") {
+    await recordInterpret({
+      ...baseLog,
+      provider: provider.id,
+      latencyMs: Date.now() - started,
+      outcome: "rate-limited",
+      errorReason: quota,
+    });
+    return Response.json({ error: "RATE_LIMIT", reason: "rate-limited" }, { status: 429 });
+  }
+
+  const skipModels = await loadExhaustedModels().catch(() => []);
   const composed = composeReadingPrompt({
     question,
     spread,
@@ -94,7 +144,31 @@ export async function POST(request: Request) {
     selfReview: selfReviewEnabled(),
     locale,
     reviewContext: reviewContextFrom(composed, spread, locale),
+    skipModels,
+    onQuota: async (model) => {
+      await markModelExhausted(model).catch(() => undefined);
+    },
   });
-  if ("reading" in result) return Response.json(result);
+  const latencyMs = Date.now() - started;
+  if ("reading" in result) {
+    await recordInterpret({
+      ...baseLog,
+      readingJson: JSON.stringify(result.reading),
+      provider: provider.id,
+      modelUsed: result.model,
+      modelsTried: result.modelsTried,
+      usage: result.usage,
+      latencyMs,
+      outcome: "success",
+    });
+    return Response.json({ reading: result.reading });
+  }
+  await recordInterpret({
+    ...baseLog,
+    provider: provider.id,
+    latencyMs,
+    outcome: failureOutcome(result.reason),
+    errorReason: result.reason,
+  });
   return Response.json(result, { status: 502 });
 }

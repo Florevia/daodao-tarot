@@ -230,13 +230,16 @@ describe("gemini", () => {
     ]);
     assert.deepEqual(levels, ["low", "low", "low"]);
     assert.equal(JSON.stringify(result).includes("secret-value"), false);
-    assert.deepEqual(result, {
-      reading: {
+    assert.ok("reading" in result);
+    if ("reading" in result) {
+      assert.deepEqual(result.reading, {
         cards: [{ positionId: "past", body: "过去这一张。" }],
         connection: "连在一起。",
         conclusion: "先做一件小事。",
-      },
-    });
+      });
+      assert.equal(result.model, "gemini-3-flash-preview");
+      assert.deepEqual(result.modelsTried, ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3-flash-preview"]);
+    }
 
     const stopped: string[] = [];
     const modelError = await requestGeminiInterpretation({
@@ -378,6 +381,37 @@ describe("gemini", () => {
     assert.equal(keptCalls, 2);
     assert.ok("reading" in kept);
     if ("reading" in kept) assert.match(kept.reading.overview ?? "", /这副牌/);
+  });
+
+  it("skips an exhausted model and remembers a fresh 429", async () => {
+    const calls: string[] = [];
+    const flagged: string[] = [];
+    const result = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "sys",
+      user: {},
+      positions: [{ id: "past", names: ["过去"] }],
+      skipModels: ["gemini-3.6-flash"],
+      onQuota: async (model) => {
+        flagged.push(model);
+      },
+      fetchImpl: async (url) => {
+        calls.push(String(url));
+        if (String(url).includes("gemini-3.8-flash")) return new Response("quota", { status: 429 });
+        return Response.json({
+          candidates: [{ content: { parts: [{ text: JSON.stringify({
+            cards: [{ positionId: "past", body: "过去这一张。" }],
+            connection: "连在一起。",
+            conclusion: "先做一件小事。",
+          }) }] } }],
+        });
+      },
+    });
+    assert.equal(calls.some((url) => url.includes("gemini-3.6-flash")), false);
+    assert.deepEqual(flagged, ["gemini-3.8-flash"]);
+    assert.ok("reading" in result);
+    if ("reading" in result) assert.equal(result.model, "gemini-3-flash-preview");
   });
 
   it("does not start the next model after the shared deadline", async () => {

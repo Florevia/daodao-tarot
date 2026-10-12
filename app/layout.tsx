@@ -4,7 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { ThemeBoot } from "@/components/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { I18nProvider } from "@/lib/i18n";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 import "./globals.css";
@@ -26,13 +26,22 @@ export const metadata: Metadata = {
   description:
     "叨叨占卜师（Daodao Tarot）是一款可直接使用的塔罗占卜应用。完整 78 张伟特塔罗，支持每日一牌、三牌阵、关系、事业与凯尔特十字。塔罗解读意在帮助你看清处境、梳理思路。涉及健康、法律、财务等重要决定时，请同时听取专业人士的意见。",
   keywords: ["塔罗", "塔罗牌", "占卜", "伟特", "凯尔特十字", "叨叨占卜师", "Daodao Tarot", "tarot"],
+  alternates: { canonical: siteUrl },
   openGraph: {
     title: "叨叨占卜师 Daodao Tarot",
     description: "把问题放下，让七十八张伟特塔罗一张一张说给你听。塔罗解读意在帮助你看清处境、梳理思路。涉及健康、法律、财务等重要决定时，请同时听取专业人士的意见。",
+    url: siteUrl,
     locale: "zh_CN",
     type: "website",
     siteName: "叨叨占卜师",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f3ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#100c14" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -41,7 +50,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var stored=localStorage.getItem("daodao-theme");var theme=stored==="light"||stored==="dark"?stored:(window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");var root=document.documentElement;root.classList.toggle("dark",theme==="dark");root.style.colorScheme=theme;}catch(e){}})();`,
+            __html: `(function(){try{var root=document.documentElement;var stored=localStorage.getItem("daodao-theme");var theme=stored==="light"||stored==="dark"?stored:(window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");root.classList.toggle("dark",theme==="dark");root.style.colorScheme=theme;var lang=localStorage.getItem("daodao-tarot-locale");root.lang=lang==="en"?"en":"zh-CN";}catch(e){}})();`,
           }}
         />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

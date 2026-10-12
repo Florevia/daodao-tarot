@@ -1,4 +1,5 @@
 import { readSession } from "@/lib/auth";
+import { consumeReadingWrite, prismaCounterStore, trimReadings } from "@/lib/limits";
 import { prisma } from "@/lib/prisma";
 import { sanitizeContext } from "@/lib/reading-context";
 import { validateDrawnCards } from "@/lib/reading-record";
@@ -42,6 +43,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await readSession();
   if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const allowed = await consumeReadingWrite(prismaCounterStore(), user.id).catch(() => false);
+  if (!allowed) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
   const body = await request.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success || !validateDrawnCards(parsed.data.spreadId, parsed.data.cards)) {
@@ -68,5 +71,6 @@ export async function POST(request: Request) {
       aiInterpretation: parsed.data.aiInterpretation?.trim() || null,
     },
   });
+  await trimReadings(user.id).catch(() => undefined);
   return Response.json({ reading: serializeReading(reading) });
 }

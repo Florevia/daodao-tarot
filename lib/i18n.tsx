@@ -35,7 +35,7 @@ const zh = {
   example3: "最近这股不安，到底在提醒我什么？",
   example4: "今天有什么是我该轻轻看见的？",
   useExample: "用这句提问",
-  footerDisclaimer: "塔罗解读意在帮助你看清处境、梳理思路。涉及健康、法律、财务等重要决定时，请同时听取专业人士的意见。",
+  footerDisclaimer: "塔罗解读意在帮助你看清处境、梳理思路。涉及健康、法律、财务等重要决定时，请同时听取专业人士的意见。你写下的问题会保存在服务器上，只用于改进这项服务，不会公开。",
   footerArt: "牌面图为 1909 年 Pamela Colman Smith 绘制的伟特塔罗，公有领域。",
   questionLabel: "你想问的事",
   contextTitle: "先对一下情况",
@@ -72,6 +72,9 @@ const zh = {
   conclusionTitle: "落到问题上",
   aiRate: "这一小时问得有点密，先按牌义库来读。",
   aiQuota: "叨叨今天的解读次数用完了，下面先按牌义库来读。",
+  aiDaily: "今天的解读次数已经用完了，下面先按牌义库来读。明天可以再来。",
+  aiSaveFailed: "保存失败，点此重试",
+  tooManyAttempts: "试得太勤了，请过一会儿再来。",
   save: "保存这次占卜",
   saving: "保存中…",
   saved: "已保存",
@@ -79,7 +82,7 @@ const zh = {
   savedGuest: "已留在这台设备上。登录后可以带到别的地方。",
   savedAccount: "已保存到你的账号。",
   newReading: "再占一次",
-  disclaimerShort: "塔罗解读意在帮助你看清处境、梳理思路。涉及健康、法律、财务等重要决定时，请同时听取专业人士的意见。",
+  disclaimerShort: "塔罗解读意在帮助你看清处境、梳理思路。涉及健康、法律、财务等重要决定时，请同时听取专业人士的意见。你写下的问题会保存在服务器上，只用于改进这项服务，不会公开。",
   historyTitle: "占卜记录",
   historyLead: "翻过的牌还在。可以回来再读，也可以删掉。",
   historyEmpty: "还没有记录。先去抽一组牌，再决定要不要留下。",
@@ -204,7 +207,7 @@ const en: { [K in keyof typeof zh]: string } = {
   example3: "What is this recent unease trying to show me?",
   example4: "What should I see gently today?",
   useExample: "Ask this",
-  footerDisclaimer: "Tarot readings are meant to help you see your situation clearly and sort through your thoughts. For important decisions about health, law, or money, please also seek professional advice.",
+  footerDisclaimer: "Tarot readings are meant to help you see your situation clearly and sort through your thoughts. For important decisions about health, law, or money, please also seek professional advice. Questions you write are stored on the server to improve the service and are not shown publicly.",
   footerArt: "Card art is the 1909 Pamela Colman Smith Rider–Waite deck, public domain.",
   questionLabel: "What you want to ask",
   contextTitle: "A little context",
@@ -241,6 +244,9 @@ const en: { [K in keyof typeof zh]: string } = {
   conclusionTitle: "What to do with the question",
   aiRate: "That is a lot of readings for one hour, so this one uses the card library.",
   aiQuota: "Daodao has reached today's reading limit, so this one uses the card library.",
+  aiDaily: "Today's reading limit is used up, so this one uses the card library. You can come back tomorrow.",
+  aiSaveFailed: "Could not save. Tap to retry.",
+  tooManyAttempts: "Too many attempts. Please wait a little and try again.",
   save: "Save this reading",
   saving: "Saving…",
   saved: "Saved",
@@ -248,7 +254,7 @@ const en: { [K in keyof typeof zh]: string } = {
   savedGuest: "Kept on this device. Log in when you want it to travel with you.",
   savedAccount: "Saved to your account.",
   newReading: "Read again",
-  disclaimerShort: "Tarot readings are meant to help you see your situation clearly and sort through your thoughts. For important decisions about health, law, or money, please also seek professional advice.",
+  disclaimerShort: "Tarot readings are meant to help you see your situation clearly and sort through your thoughts. For important decisions about health, law, or money, please also seek professional advice. Questions you write are stored on the server to improve the service and are not shown publicly.",
   historyTitle: "Reading history",
   historyLead: "The cards you turned are still here. Read them again, or let them go.",
   historyEmpty: "Nothing saved yet. Draw a spread, then decide whether to keep it.",
@@ -398,6 +404,6 @@ export function errorText(code: string, t: Messages): string {
   if (code === "EMAIL_TAKEN") return t.emailTaken;
   if (code === "INVALID_INPUT") return t.invalidInput;
   if (code === "UNAUTHORIZED") return t.unauthorized;
-  if (code === "RATE_LIMIT") return t.aiRate;
+  if (code === "RATE_LIMIT") return t.tooManyAttempts;
   return t.genericError;
 }

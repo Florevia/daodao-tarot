@@ -26,6 +26,33 @@ type Placement = DrawnCard & { revealed: boolean };
 
 const phases: Phase[] = ["ask", "shuffle", "pick", "reveal"];
 
+function deviceHeader(): Record<string, string> {
+  try {
+    const key = "daodao-device";
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(key, id);
+    }
+    return { "x-daodao-device": id };
+  } catch {
+    return {};
+  }
+}
+
+async function putAiReading(id: string, stored: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/readings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aiInterpretation: stored }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 function pickSentence(locale: Locale, index: number, total: number, position: string): string {
   if (locale === "zh") {
     return `请抽取第 ${index} 张牌（共 ${total} 张）——代表：${position}`;
@@ -50,6 +77,8 @@ export function ReadingFlow() {
   const savedIdRef = useRef<string | null>(null);
   const userRef = useRef(user);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [aiSaveFailed, setAiSaveFailed] = useState(false);
+  const pendingAiRef = useRef<string | null>(null);
   const [activePosition, setActivePosition] = useState<string | null>(null);
   const [context, setContext] = useState<ReadingContext>({});
   const [landedSlot, setLandedSlot] = useState<number | null>(null);
@@ -89,6 +118,8 @@ export function ReadingFlow() {
     setFailReason("");
     setAttempt(0);
     setSaveState("idle");
+    setAiSaveFailed(false);
+    pendingAiRef.current = null;
     setActivePosition(null);
   }
 
@@ -200,7 +231,7 @@ export function ReadingFlow() {
       try {
         const response = await fetch("/api/interpret", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...deviceHeader() },
           body: JSON.stringify(payload),
           signal: controller.signal,
         });
@@ -213,14 +244,14 @@ export function ReadingFlow() {
         }
         setAiReading(data.reading);
         setAnswerState("ai");
+        setAiSaveFailed(false);
         const stored = JSON.stringify(data.reading);
         const id = savedIdRef.current;
         if (id && userRef.current) {
-          await fetch(`/api/readings/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ aiInterpretation: stored }),
-          });
+          pendingAiRef.current = stored;
+          const saved = await putAiReading(id, stored);
+          const retried = saved || (await putAiReading(id, stored));
+          if (!controller.signal.aborted) setAiSaveFailed(!retried);
         } else if (id) {
           const existing = loadGuestReadings().find((item) => item.id === id);
           if (existing) upsertGuestReading({ ...existing, aiInterpretation: stored });
@@ -445,6 +476,13 @@ export function ReadingFlow() {
                         : { kind: "loading" }
                   }
                   saveState={saveState}
+                  aiSaveFailed={aiSaveFailed}
+                  onRetryAiSave={() => {
+                    const id = savedIdRef.current;
+                    const stored = pendingAiRef.current;
+                    if (!id || !stored) return;
+                    void putAiReading(id, stored).then((ok) => setAiSaveFailed(!ok));
+                  }}
                   activePosition={activePosition}
                   onRetry={() => {
                     setAiReading(null);
@@ -549,6 +587,8 @@ export function ReadingPanels({
   context = null,
   view,
   saveState,
+  aiSaveFailed = false,
+  onRetryAiSave,
   onRetry,
   onSave,
   onReset,
@@ -562,6 +602,8 @@ export function ReadingPanels({
   context?: ReadingContext | null;
   view: AnswerView;
   saveState?: "idle" | "saving" | "saved" | "error";
+  aiSaveFailed?: boolean;
+  onRetryAiSave?: () => void;
   onRetry?: () => void;
   onSave?: () => void;
   onReset?: () => void;
@@ -588,17 +630,29 @@ export function ReadingPanels({
       ) : null}
 
       {view.kind === "ai" ? (
-        <AiAnswer
-          spread={spread}
-          drawn={drawn}
-          locale={locale}
-          reading={view.reading}
-          situation={situation}
-          activePosition={activePosition}
-          overviewTitle={t.overviewTitle}
-          connectionTitle={t.connectionTitle}
-          conclusionTitle={t.conclusionTitle}
-        />
+        <>
+          <AiAnswer
+            spread={spread}
+            drawn={drawn}
+            locale={locale}
+            reading={view.reading}
+            situation={situation}
+            activePosition={activePosition}
+            overviewTitle={t.overviewTitle}
+            connectionTitle={t.connectionTitle}
+            conclusionTitle={t.conclusionTitle}
+          />
+          {aiSaveFailed ? (
+            <button
+              type="button"
+              className="text-left text-sm text-primary underline decoration-primary/40"
+              onClick={onRetryAiSave}
+              data-testid="ai-save-retry"
+            >
+              {t.aiSaveFailed}
+            </button>
+          ) : null}
+        </>
       ) : null}
 
       {view.kind === "saved-prose" ? (
@@ -613,9 +667,13 @@ export function ReadingPanels({
           {view.kind === "fallback" ? (
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <p className="text-sm text-muted-foreground" data-testid="fallback-note">
-                {view.reason === "RATE_LIMIT" ? t.aiRate : view.reason === "quota" ? t.aiQuota : t.fallbackNote}
+                {view.reason === "rate-limited" || view.reason === "RATE_LIMIT"
+                  ? t.aiDaily
+                  : view.reason === "quota"
+                    ? t.aiQuota
+                    : t.fallbackNote}
               </p>
-              {onRetry && view.reason !== "quota" ? (
+              {onRetry && view.reason !== "quota" && view.reason !== "rate-limited" && view.reason !== "RATE_LIMIT" ? (
                 <Button variant="outline" className="h-9" onClick={onRetry} data-testid="retry-reading">
                   {t.retryReading}
                 </Button>

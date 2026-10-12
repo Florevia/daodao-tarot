@@ -1,4 +1,5 @@
 import { readSession } from "@/lib/auth";
+import { consumeReadingWrite, prismaCounterStore } from "@/lib/limits";
 import { prisma } from "@/lib/prisma";
 import { serializeReading } from "@/lib/serialize-reading";
 import { z } from "zod";
@@ -23,6 +24,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await readSession();
   if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const allowed = await consumeReadingWrite(prismaCounterStore(), user.id).catch(() => false);
+  if (!allowed) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
   const { id } = await context.params;
   const existing = await ownedReading(id, user.id);
   if (!existing) return Response.json({ error: "NOT_FOUND" }, { status: 404 });

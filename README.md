@@ -59,12 +59,19 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | --- | --- | --- |
 | `DATABASE_URL` | 必须 | Postgres 连接串。本地见 `.env.example`。生产环境用直连（不要用连接池地址），并带上服务商要求的 `sslmode`。 |
 | `AUTH_SECRET` | 生产必须 | 用来签名登录 cookie。本地可以沿用 `.env.example` 里的开发值。 |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | 可选 | 没有 ZenMux 密钥时，翻开牌后会请 Gemini 按知识库写一份解牌。`GEMINI_API_KEY` 是同一密钥的别名。没有密钥、调用失败或超过每小时次数时，改用内置牌义。 |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | 可选 | 没有 ZenMux 密钥时，翻开牌后会请 Gemini 按知识库写一份解牌。`GEMINI_API_KEY` 是同一密钥的别名。没有密钥、调用失败或超过每日次数时，改用内置牌义。 |
 | `GEMINI_MODEL` | 可选 | 默认 `gemini-3.6-flash`。不可用或该模型额度用尽（429）时，按顺序再试 `gemini-3.8-flash`、`gemini-3-flash-preview`、`gemini-flash-lite-latest`、`gemini-3.5-flash-lite`。同一种非额度错误出现第二次就停止。全部额度用尽时仍回退到内置牌义。 |
 | `ZENMUX_API_KEY` | 可选 | 设置后优先走 ZenMux（OpenAI 兼容接口 `https://zenmux.ai/api/v1/chat/completions`），用同一套解牌提示和 JSON 结构。 |
 | `ZENMUX_MODEL` | 可选 | 默认 `anthropic/claude-haiku-5.5`。 |
 | `AI_PROVIDER` | 可选 | `gemini` 或 `zenmux`。两边都有密钥时，用它指定走哪一家；不设置则有 ZenMux 密钥就用 ZenMux。 |
-| `NEXT_PUBLIC_SITE_URL` | 生产建议 | 站点公开地址，用于 sitemap 和 Open Graph。例如 `https://your-domain.vercel.app`。 |
+| `NEXT_PUBLIC_SITE_URL` | 生产建议 | 站点公开地址，用于 sitemap、canonical 和 Open Graph。例如 `https://your-domain.vercel.app`。 |
+| `ADMIN_EMAILS` | 管理后台 | 逗号分隔的邮箱。只有这些账号能打开 `/admin`，其他人看到 404。 |
+| `AI_DAILY_LIMIT` | 可选 | 每个 IP + 设备每天可请求的 AI 解读次数，默认 10。按太平洋时间的日期计算。超出后返回牌义库。 |
+| `AI_SITE_DAILY_CAP` | 可选 | 全站每天的 AI 解读上限，默认 90。 |
+| `AUTH_ATTEMPT_LIMIT` | 可选 | 登录和注册，每个 IP、每个邮箱，15 分钟内的尝试次数，默认 10。 |
+| `READING_WRITE_LIMIT` | 可选 | 每个账号每小时可写入记录的次数，默认 30。账号最多保留最新 500 条。 |
+| `READING_KEEP` | 可选 | 每个账号保留的记录条数，默认 500。 |
+| `GEMINI_FREE_TIER` | 可选 | 默认把 Gemini 调用的花费记为 0，并另记按付费价的金额。设为 `0` 则按价目计入花费。 |
 
 ## Environment variables
 
@@ -72,12 +79,19 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres connection string. Local value is in `.env.example`. In production use the direct URL, not a pooler, and include the provider's `sslmode`. |
 | `AUTH_SECRET` | Yes in production | Signs the session cookie. The example value is fine for local development. |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | No | When no ZenMux key is set, revealing the cards asks Gemini for one reading grounded in the knowledge base. `GEMINI_API_KEY` is an alias. With no key, a failed call, or the hourly limit, the built-in reading is shown instead. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | No | When no ZenMux key is set, revealing the cards asks Gemini for one reading grounded in the knowledge base. `GEMINI_API_KEY` is an alias. With no key, a failed call, or the daily limit, the built-in reading is shown instead. |
 | `GEMINI_MODEL` | No | Defaults to `gemini-3.6-flash`. If that model is unavailable or returns 429, the server tries `gemini-3.8-flash`, `gemini-3-flash-preview`, `gemini-flash-lite-latest`, then `gemini-3.5-flash-lite`. The same non-quota error twice stops the chain. If every model is out of quota, the built-in reading is shown. |
 | `ZENMUX_API_KEY` | No | When set, readings use ZenMux (OpenAI-compatible `https://zenmux.ai/api/v1/chat/completions`) with the same prompt and JSON shape. |
 | `ZENMUX_MODEL` | No | Defaults to `anthropic/claude-haiku-5.5`. |
 | `AI_PROVIDER` | No | `gemini` or `zenmux`. When both keys exist, this chooses the provider. Unset, a ZenMux key wins. |
-| `NEXT_PUBLIC_SITE_URL` | Recommended in production | Public origin used by the sitemap and Open Graph tags, for example `https://your-domain.vercel.app`. |
+| `NEXT_PUBLIC_SITE_URL` | Recommended in production | Public origin used by the sitemap, canonical URL, and Open Graph tags, for example `https://your-domain.vercel.app`. |
+| `ADMIN_EMAILS` | For /admin | Comma-separated emails. Only those accounts can open `/admin`; everyone else gets a 404. |
+| `AI_DAILY_LIMIT` | No | AI readings per IP and device per Pacific day. Default 10. Over the limit, the card library is shown. |
+| `AI_SITE_DAILY_CAP` | No | Site-wide AI readings per Pacific day. Default 90. |
+| `AUTH_ATTEMPT_LIMIT` | No | Login and register attempts per IP and per email in 15 minutes. Default 10. |
+| `READING_WRITE_LIMIT` | No | Saved-reading writes per account per hour. Default 30. Each account keeps the latest 500. |
+| `READING_KEEP` | No | Readings kept per account. Default 500. |
+| `GEMINI_FREE_TIER` | No | Gemini calls are recorded at $0 by default, with a separate paid-price estimate. Set `0` to count the price table as spend. |
 
 ## 部署到 Vercel
 
@@ -94,12 +108,13 @@ Prisma 已经使用 PostgreSQL。不要改构建命令：Vercel 的 Next.js 默�
 | `ZENMUX_API_KEY` | 可选。设置后优先使用 ZenMux。 |
 | `ZENMUX_MODEL` | 可选。默认 `anthropic/claude-haiku-5.5`。 |
 | `AI_PROVIDER` | 可选。`gemini` 或 `zenmux`，两边都有密钥时用来指定。 |
+| `ADMIN_EMAILS` | 可选。逗号分隔的管理员邮箱，才能打开 `/admin`。 |
 
 然后：
 
 1. 把仓库导入 Vercel，Framework Preset 选 Next.js。Install Command 和 Build Command 保持默认（`npm install` 与 `npm run build`）。
 2. 确认上面的环境变量已经写在将要部署的环境里。构建机器必须能连上数据库。
-3. Deploy。首次构建会建好 `User` 和 `Reading` 表。
+3. Deploy。首次构建会建好 `User` 和 `Reading` 表，之后的迁移会加上限额、模型额度和解读日志。
 4. 打开线上地址，注册一个账号，抽一组牌并保存，再在记录页打开并删除，确认数据库可用。
 
 如果 Neon 或 Vercel 另外提供了 `DATABASE_URL_UNPOOLED`、`POSTGRES_URL_NON_POOLING` 或 `DIRECT_URL`，构建脚本会优先用它们做迁移，运行时仍读 `DATABASE_URL`。只设置直连的 `DATABASE_URL` 就够用。
@@ -119,12 +134,13 @@ In the Vercel project, under Settings → Environment Variables, set these for P
 | `ZENMUX_API_KEY` | Optional. When set, readings prefer ZenMux. |
 | `ZENMUX_MODEL` | Optional. Defaults to `anthropic/claude-haiku-5.5`. |
 | `AI_PROVIDER` | Optional. `gemini` or `zenmux`, used when both keys are set. |
+| `ADMIN_EMAILS` | Optional. Comma-separated admin emails. Required to open `/admin`. |
 
 Then:
 
 1. Import the repository into Vercel and choose the Next.js framework preset. Leave Install Command and Build Command at their defaults (`npm install` and `npm run build`).
 2. Confirm the variables above exist on the environment you are deploying. The build must be able to reach the database.
-3. Deploy. The first build creates the `User` and `Reading` tables.
+3. Deploy. The first build creates the `User` and `Reading` tables. Later migrations add the rate limits, model-quota memory, and the interpret log.
 4. On the live site, register, draw and save a reading, then open and delete it from history.
 
 If Neon or Vercel also sets `DATABASE_URL_UNPOOLED`, `POSTGRES_URL_NON_POOLING`, or `DIRECT_URL`, the build script prefers those for migrations and still uses `DATABASE_URL` at runtime. A single direct `DATABASE_URL` is enough.
@@ -156,13 +172,13 @@ The 78 images in `public/cards/` come from the Wikimedia Commons category [Rider
 ## 限制
 
 - 生产环境使用 Postgres 直连字符串作为 `DATABASE_URL`。无服务器函数各自建连接，流量很大时再考虑连接池。
-- 解牌走 ZenMux 或 Google Gemini，依据知识库，并使用你自己的 API 额度。同一 IP 每小时大约 30 次；超出、失败、额度用尽或没有密钥时，改为显示内置牌义。
+- 解牌走 ZenMux 或 Google Gemini，依据知识库，并使用你自己的 API 额度。每个 IP 加设备每天大约 10 次，全站每天大约 90 次；超出、失败、额度用尽或没有密钥时，改为显示内置牌义。Gemini 某个模型返回当日额度用尽后，会记到太平洋时间次日零点，期间不再调用它。
 - 牌义是简短的现代解读，不是某一本书的全文。
 - 没有第三方登录，也没有密码重置邮件。
 
 ## Limitations
 
 - Production expects a direct Postgres URL in `DATABASE_URL`. Each serverless instance opens its own connections; add a pooler only after you actually hit connection limits.
-- The reading is written by ZenMux or Google Gemini from the knowledge base and spends your own API quota. Each IP is limited to about 30 requests an hour. Past that limit, on failure, on a 429, or with no key, the built-in reading is shown instead.
+- The reading is written by ZenMux or Google Gemini from the knowledge base and spends your own API quota. Each IP and device is limited to about 10 AI readings a Pacific day, and the whole site to about 90. Past that limit, on failure, on a 429, or with no key, the built-in reading is shown instead. A Gemini model that returns a daily-quota 429 is skipped until the next Pacific midnight.
 - Meanings are short modern readings, not the full text of a printed book.
 - There is no social login and no password-reset email.
