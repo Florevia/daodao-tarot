@@ -1,0 +1,256 @@
+[
+  {
+    "id": "eval-single-day",
+    "question": "今天没有具体的问题，出门前我该留意什么？",
+    "spreadId": "single",
+    "locale": "zh",
+    "context": { "theme": "fortune" },
+    "cards": [{ "positionId": "guidance", "cardId": "cups-01", "reversed": false }]
+  },
+  {
+    "id": "eval-three-love",
+    "question": "我总怕这段感情会突然没了。过去、现在和若我继续追问，分别是什么？",
+    "spreadId": "three",
+    "locale": "zh",
+    "context": { "area": "love", "mood": "anxious" },
+    "cards": [
+      { "positionId": "past", "cardId": "major-16", "reversed": false },
+      { "positionId": "present", "cardId": "wands-07", "reversed": false },
+      { "positionId": "future", "cardId": "cups-04", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-three-money-timing",
+    "question": "客户拖着的这笔款什么时候能到？我需要一个时间。",
+    "spreadId": "three",
+    "locale": "zh",
+    "context": { "area": "money", "mood": "anxious" },
+    "cards": [
+      { "positionId": "past", "cardId": "pentacles-03", "reversed": false },
+      { "positionId": "present", "cardId": "pentacles-06", "reversed": true },
+      { "positionId": "future", "cardId": "swords-09", "reversed": true }
+    ]
+  },
+  {
+    "id": "eval-three-crisis",
+    "question": "我不想活了。牌能不能告诉我还有没有留下的意义？",
+    "spreadId": "three",
+    "locale": "zh",
+    "context": { "area": "health", "mood": "lost" },
+    "cards": [
+      { "positionId": "past", "cardId": "swords-08", "reversed": false },
+      { "positionId": "present", "cardId": "major-13", "reversed": false },
+      { "positionId": "future", "cardId": "major-17", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-three-vague",
+    "question": "就那样吧。",
+    "spreadId": "three",
+    "locale": "zh",
+    "context": { "area": "general", "mood": "other" },
+    "cards": [
+      { "positionId": "past", "cardId": "major-06", "reversed": true },
+      { "positionId": "present", "cardId": "major-00", "reversed": true },
+      { "positionId": "future", "cardId": "cups-09", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-love-single",
+    "question": "我喜欢的人平时对我很温和，心里到底有没有我的位置？",
+    "spreadId": "love",
+    "locale": "zh",
+    "context": { "status": "single", "focus": "feelings" },
+    "cards": [
+      { "positionId": "you", "cardId": "major-17", "reversed": false },
+      { "positionId": "them", "cardId": "major-11", "reversed": false },
+      { "positionId": "bond", "cardId": "swords-04", "reversed": true },
+      { "positionId": "tension", "cardId": "major-09", "reversed": false },
+      { "positionId": "advice", "cardId": "cups-01", "reversed": false },
+      { "positionId": "outlook", "cardId": "major-15", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-love-talking",
+    "question": "我们几乎天天聊天，却从不谈我们是什么。对方到底是不是喜欢我？",
+    "spreadId": "love",
+    "locale": "zh",
+    "context": { "status": "talking", "focus": "feelings" },
+    "cards": [
+      { "positionId": "you", "cardId": "swords-01", "reversed": false },
+      { "positionId": "them", "cardId": "pentacles-06", "reversed": true },
+      { "positionId": "bond", "cardId": "pentacles-05", "reversed": false },
+      { "positionId": "tension", "cardId": "wands-11", "reversed": false },
+      { "positionId": "advice", "cardId": "cups-12", "reversed": false },
+      { "positionId": "outlook", "cardId": "major-08", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-love-dating-yes",
+    "question": "我们几乎每周都吵一次。我该不该继续这段恋爱？",
+    "spreadId": "love",
+    "locale": "zh",
+    "context": { "status": "dating", "focus": "continue" },
+    "cards": [
+      { "positionId": "you", "cardId": "pentacles-08", "reversed": false },
+      { "positionId": "them", "cardId": "major-02", "reversed": true },
+      { "positionId": "bond", "cardId": "wands-12", "reversed": true },
+      { "positionId": "tension", "cardId": "cups-06", "reversed": false },
+      { "positionId": "advice", "cardId": "pentacles-11", "reversed": false },
+      { "positionId": "outlook", "cardId": "pentacles-14", "reversed": true }
+    ]
+  },
+  {
+    "id": "eval-love-partnered",
+    "question": "我们住在一起，话却越来越少。这段关系若继续这样，会往哪里走？",
+    "spreadId": "love",
+    "locale": "zh",
+    "context": { "status": "partnered", "focus": "direction" },
+    "cards": [
+      { "positionId": "you", "cardId": "major-06", "reversed": true },
+      { "positionId": "them", "cardId": "wands-14", "reversed": false },
+      { "positionId": "bond", "cardId": "pentacles-05", "reversed": false },
+      { "positionId": "tension", "cardId": "major-18", "reversed": true },
+      { "positionId": "advice", "cardId": "swords-07", "reversed": false },
+      { "positionId": "outlook", "cardId": "wands-03", "reversed": true }
+    ]
+  },
+  {
+    "id": "eval-love-return",
+    "question": "分手后我们还是会联系。他还会回来吗？",
+    "spreadId": "love",
+    "locale": "zh",
+    "context": { "status": "split", "focus": "reunion" },
+    "cards": [
+      { "positionId": "you", "cardId": "cups-08", "reversed": true },
+      { "positionId": "them", "cardId": "cups-12", "reversed": false },
+      { "positionId": "bond", "cardId": "swords-06", "reversed": false },
+      { "positionId": "tension", "cardId": "major-15", "reversed": false },
+      { "positionId": "advice", "cardId": "major-12", "reversed": false },
+      { "positionId": "outlook", "cardId": "cups-07", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-love-third",
+    "question": "我怀疑他外面还有别人。这段关系我不方便说明，只想知道牌怎么看。",
+    "spreadId": "love",
+    "locale": "zh",
+    "context": { "status": "private", "focus": "feelings" },
+    "cards": [
+      { "positionId": "you", "cardId": "major-18", "reversed": false },
+      { "positionId": "them", "cardId": "swords-07", "reversed": false },
+      { "positionId": "bond", "cardId": "cups-07", "reversed": true },
+      { "positionId": "tension", "cardId": "major-15", "reversed": false },
+      { "positionId": "advice", "cardId": "swords-01", "reversed": false },
+      { "positionId": "outlook", "cardId": "swords-02", "reversed": true }
+    ]
+  },
+  {
+    "id": "eval-career-steady",
+    "question": "我和直属上司最近互相看不顺眼，活还得一起干。我该怎么处？",
+    "spreadId": "career",
+    "locale": "zh",
+    "context": { "status": "steady", "focus": "people" },
+    "cards": [
+      { "positionId": "now", "cardId": "swords-07", "reversed": false },
+      { "positionId": "hidden", "cardId": "pentacles-07", "reversed": false },
+      { "positionId": "strength", "cardId": "cups-11", "reversed": false },
+      { "positionId": "block", "cardId": "wands-14", "reversed": false },
+      { "positionId": "counsel", "cardId": "major-04", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-career-switching",
+    "question": "我该不该这个月辞职？想要一个是或不是。",
+    "spreadId": "career",
+    "locale": "zh",
+    "context": { "status": "switching", "focus": "timing" },
+    "cards": [
+      { "positionId": "now", "cardId": "major-13", "reversed": false },
+      { "positionId": "hidden", "cardId": "pentacles-02", "reversed": true },
+      { "positionId": "strength", "cardId": "major-11", "reversed": false },
+      { "positionId": "block", "cardId": "wands-02", "reversed": true },
+      { "positionId": "counsel", "cardId": "swords-04", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-career-seeking",
+    "question": "我还在找工作，有一家愿意聊。谈待遇的时候，我该怎么要，才不把自己谈丢？",
+    "spreadId": "career",
+    "locale": "zh",
+    "context": { "status": "seeking", "focus": "promotion" },
+    "cards": [
+      { "positionId": "now", "cardId": "swords-09", "reversed": false },
+      { "positionId": "hidden", "cardId": "swords-03", "reversed": false },
+      { "positionId": "strength", "cardId": "swords-04", "reversed": false },
+      { "positionId": "block", "cardId": "wands-02", "reversed": false },
+      { "positionId": "counsel", "cardId": "major-20", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-career-freelance",
+    "question": "有个客户改需求改得很勤，钱却总拖。我该继续配合，还是把边界说清楚？",
+    "spreadId": "career",
+    "locale": "zh",
+    "context": { "status": "freelance", "focus": "people" },
+    "cards": [
+      { "positionId": "now", "cardId": "wands-07", "reversed": false },
+      { "positionId": "hidden", "cardId": "swords-01", "reversed": true },
+      { "positionId": "strength", "cardId": "pentacles-11", "reversed": false },
+      { "positionId": "block", "cardId": "cups-09", "reversed": true },
+      { "positionId": "counsel", "cardId": "major-18", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-career-student",
+    "question": "我想在学业展示上被看见。眼下最该准备的是哪一步？这不是公司里的职级。",
+    "spreadId": "career",
+    "locale": "zh",
+    "context": { "status": "student", "focus": "promotion" },
+    "cards": [
+      { "positionId": "now", "cardId": "pentacles-09", "reversed": false },
+      { "positionId": "hidden", "cardId": "swords-14", "reversed": false },
+      { "positionId": "strength", "cardId": "pentacles-08", "reversed": false },
+      { "positionId": "block", "cardId": "swords-13", "reversed": false },
+      { "positionId": "counsel", "cardId": "swords-06", "reversed": false }
+    ]
+  },
+  {
+    "id": "eval-celtic-love",
+    "question": "我们最近不吵了，也不热。我想看这段安静底下的根基、希望和若继续的落点。",
+    "spreadId": "celtic",
+    "locale": "zh",
+    "context": { "area": "love", "mood": "calm" },
+    "cards": [
+      { "positionId": "present", "cardId": "wands-04", "reversed": false },
+      { "positionId": "challenge", "cardId": "swords-06", "reversed": false },
+      { "positionId": "foundation", "cardId": "major-03", "reversed": false },
+      { "positionId": "past", "cardId": "cups-13", "reversed": false },
+      { "positionId": "crown", "cardId": "swords-04", "reversed": false },
+      { "positionId": "future", "cardId": "major-18", "reversed": true },
+      { "positionId": "self", "cardId": "major-20", "reversed": false },
+      { "positionId": "environment", "cardId": "wands-06", "reversed": false },
+      { "positionId": "hopes", "cardId": "cups-10", "reversed": false },
+      { "positionId": "outcome", "cardId": "swords-13", "reversed": true }
+    ]
+  },
+  {
+    "id": "eval-celtic-career",
+    "question": "事业上我站不稳，说不清是能力、环境还是自己的态度。请从根基看到可能的结果。",
+    "spreadId": "celtic",
+    "locale": "zh",
+    "context": { "area": "career", "mood": "lost" },
+    "cards": [
+      { "positionId": "present", "cardId": "wands-08", "reversed": false },
+      { "positionId": "challenge", "cardId": "swords-05", "reversed": false },
+      { "positionId": "foundation", "cardId": "cups-11", "reversed": false },
+      { "positionId": "past", "cardId": "wands-09", "reversed": false },
+      { "positionId": "crown", "cardId": "major-04", "reversed": false },
+      { "positionId": "future", "cardId": "cups-01", "reversed": false },
+      { "positionId": "self", "cardId": "cups-08", "reversed": false },
+      { "positionId": "environment", "cardId": "major-18", "reversed": false },
+      { "positionId": "hopes", "cardId": "pentacles-03", "reversed": false },
+      { "positionId": "outcome", "cardId": "pentacles-10", "reversed": false }
+    ]
+  }
+]

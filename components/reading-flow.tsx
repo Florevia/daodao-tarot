@@ -595,6 +595,7 @@ export function ReadingPanels({
           reading={view.reading}
           situation={situation}
           activePosition={activePosition}
+          overviewTitle={t.overviewTitle}
           connectionTitle={t.connectionTitle}
           conclusionTitle={t.conclusionTitle}
         />
@@ -699,6 +700,7 @@ function AiAnswer({
   reading,
   situation,
   activePosition,
+  overviewTitle,
   connectionTitle,
   conclusionTitle,
 }: {
@@ -708,12 +710,19 @@ function AiAnswer({
   reading: AiReading;
   situation: string;
   activePosition: string | null;
+  overviewTitle: string;
   connectionTitle: string;
   conclusionTitle: string;
 }) {
   return (
     <div className="grid gap-4" data-testid="reading-answer">
       {situation ? <p className="text-sm text-primary" data-testid="reading-context">{situation}</p> : null}
+      {reading.overview ? (
+        <section className="rounded-2xl border border-primary/30 bg-card/60 p-4 sm:p-5" data-testid="reading-overview">
+          <h3 className="text-lg text-primary">{overviewTitle}</h3>
+          <p className="mt-2 leading-8">{reading.overview}</p>
+        </section>
+      ) : null}
       {reading.cards.map((section) => {
         const position = spread.positions.find((item) => item.id === section.positionId);
         const placement = drawn.find((item) => item.positionId === section.positionId);

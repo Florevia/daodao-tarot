@@ -1,0 +1,67 @@
+{
+  "model": "gemini-3.6-flash",
+  "request": {
+    "systemInstruction": {
+      "parts": [
+        {
+          "text": "# 自检\n\n你已经写过一稿。对照下面每一条改一稿。只返回修改后的 JSON，结构与原来相同。不要解释你改了什么。\n\n- 每张牌的意思是否属于这一张、这个正逆位，而不是同数字的另一花色。宝剑三是心痛，不是合作。宝剑七是隐瞒与取巧，不是评估选项。星币五是匮乏和被排除，不是为了赢。权杖三逆位是延迟和未出发，不是三角。\n- 处境有没有被尊重。已婚不写成开始约会。求职不写成已在职。学生不写公司职级。\n- 每一张是否都扣住问题和它的位置，而不是泛泛的牌义介绍。\n- overview 是否真的是整副的第一眼，而不是把牌再列一遍。\n- connection 是否在解释牌与牌的关系，有没有具体牌名。\n- conclusion 是否只有一件做得到的事，有没有套话。\n- 有没有禁语：关键词落在、从某某下手、列出真实的资源、仅供娱乐、绝对会、诊断、保证。\n- 画面是否用得自然。没有就补一个，堆砌就删。\n- 若问题是危机，稿子必须是支持而不是解牌。若不是，不要突然加上热线。\n- 英文请求就保持英文。positionId 原样保留。\n\n只返回修改后的 JSON。positionId 保持不变。"
+        }
+      ]
+    },
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "{\"draft\":{\"overview\":\"<<FIRST_RESPONSE_OVERVIEW>>\",\"cards\":[{\"positionId\":\"<<POSITION_ID>>\",\"body\":\"<<FIRST_RESPONSE_BODY>>\"}],\"connection\":\"<<FIRST_RESPONSE_CONNECTION>>\",\"conclusion\":\"<<FIRST_RESPONSE_CONCLUSION>>\"},\"writeIn\":\"简体中文\"}"
+          }
+        ]
+      }
+    ],
+    "generationConfig": {
+      "temperature": 0.7,
+      "responseMimeType": "application/json",
+      "responseSchema": {
+        "type": "OBJECT",
+        "properties": {
+          "overview": {
+            "type": "STRING"
+          },
+          "cards": {
+            "type": "ARRAY",
+            "items": {
+              "type": "OBJECT",
+              "properties": {
+                "positionId": {
+                  "type": "STRING"
+                },
+                "body": {
+                  "type": "STRING"
+                }
+              },
+              "required": [
+                "positionId",
+                "body"
+              ]
+            }
+          },
+          "connection": {
+            "type": "STRING"
+          },
+          "conclusion": {
+            "type": "STRING"
+          }
+        },
+        "required": [
+          "overview",
+          "cards",
+          "connection",
+          "conclusion"
+        ]
+      },
+      "thinkingConfig": {
+        "thinkingLevel": "low"
+      }
+    }
+  }
+}

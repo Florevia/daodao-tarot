@@ -2,9 +2,10 @@ import {
   INTERPRET_HOURLY_LIMIT,
   geminiApiKey,
   geminiModel,
-  geminiReadingBody,
+  readingResponseSchema,
   requestGeminiInterpretation,
 } from "@/lib/gemini";
+import { composeReadingPrompt, selfReviewEnabled } from "@/lib/prompt/compose";
 import { sanitizeContext } from "@/lib/reading-context";
 import { validateDrawnCards } from "@/lib/reading-record";
 import { getSpread } from "@/lib/spreads";
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
   const locale = parsed.data.locale;
   const context = sanitizeContext(parsed.data.spreadId, parsed.data.context);
   const question = parsed.data.question?.trim() || (locale === "zh" ? "（没有写下具体问题）" : "(no specific question)");
-  const { system, user } = geminiReadingBody({
+  const { system, user } = composeReadingPrompt({
     question,
     spread,
     locale,
@@ -89,6 +90,9 @@ export async function POST(request: Request) {
       id: position.id,
       names: [position.name.zh, position.name.en],
     })),
+    schema: readingResponseSchema,
+    selfReview: selfReviewEnabled(),
+    locale,
   });
   if ("reading" in result) return Response.json(result);
   return Response.json(result, { status: 502 });
