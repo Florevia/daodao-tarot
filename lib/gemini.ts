@@ -1,6 +1,7 @@
 import { parseAiReading, type AiReading } from "./ai-reading";
 import type { Locale } from "./cards";
 import { exampleLabel, examplesForPrompt, selectExampleCases, type PromptExample } from "./cases";
+import { repairReading } from "./prompt/checks";
 import { selfReviewPrompt, type SelfReviewContext } from "./prompt/compose";
 import { contextLabel, contextTopic, type ReadingContext } from "./reading-context";
 import type { Spread } from "./spreads";
@@ -13,8 +14,16 @@ export const INTERPRET_HOURLY_LIMIT = 30;
 /** Current flash model that still accepts new keys and handles Chinese. Override with GEMINI_MODEL. */
 export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 
-/** Tried, in order, when the chosen model is missing or overloaded. A 429 stops the chain. */
-export const GEMINI_FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"] as const;
+/**
+ * Tried after the primary model. A 429 is that model's quota and the chain
+ * continues. The same non-quota failure twice stops the chain.
+ */
+export const GEMINI_FALLBACK_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-lite-latest",
+  "gemini-3.5-flash-lite",
+] as const;
 
 /**
  * Multi-card readings were exceeding the old 30s abort. 90s stays under
@@ -295,16 +304,40 @@ export async function requestGeminiInterpretation(input: {
 
   let first: GeminiSuccess | null = null;
   let usedModel = input.model;
+  let sawQuota = false;
+  let lastFailure: GeminiFailReason | null = null;
+  const seenFailures = new Set<GeminiFailReason>();
   for (const model of chain) {
     if (signal.aborted) return { error: "AI_FAILED", reason: "timeout" };
     const result = await once(model, input.system, input.user);
     if (result === "unavailable") continue;
-    if ("error" in result) return result;
+    if ("error" in result) {
+      if (result.reason === "timeout") return result;
+      if (result.reason === "quota") {
+        sawQuota = true;
+        continue;
+      }
+      if (seenFailures.has(result.reason)) return result;
+      seenFailures.add(result.reason);
+      lastFailure = result.reason;
+      continue;
+    }
     first = result;
     usedModel = model;
     break;
   }
-  if (!first) return { error: "AI_FAILED", reason: "upstream" };
+  if (!first) {
+    if (lastFailure) return { error: "AI_FAILED", reason: lastFailure };
+    if (sawQuota) return { error: "AI_FAILED", reason: "quota" };
+    return { error: "AI_FAILED", reason: "upstream" };
+  }
+  const repaired = await repairReading(first.reading, signal, async (note) => {
+    if (signal.aborted) return null;
+    const revised = await once(usedModel, `${input.system}\n\n${note}`, input.user);
+    if (typeof revised !== "object" || !("reading" in revised)) return null;
+    return revised.reading;
+  });
+  first = { reading: repaired };
   if (!input.selfReview || signal.aborted || !input.reviewContext) return first;
   const review = selfReviewPrompt(first.reading, input.locale ?? "zh", input.reviewContext);
   const revised = await once(usedModel, review.system, review.user);

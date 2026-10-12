@@ -28,12 +28,10 @@ export type ComposedPrompt = {
     spread: string;
     situation: string;
     signals: {
-      cards: number;
+      n: number;
       majors: number;
-      minors: number;
       reversed: number;
       suits: Record<string, number>;
-      repeatedRanks: string[];
     };
     questionKind: QuestionKind | null;
     crisis: boolean;
@@ -45,7 +43,6 @@ export type ComposedPrompt = {
       orientation: string;
       keywords: string;
       topicMeaning: string;
-      advice: string;
       imagery: string;
     }[];
     gold: {
@@ -147,7 +144,7 @@ export function composeReadingPrompt(input: {
     sections.push("本次问题含有危机语言。不要解牌。按安全文档把 JSON 填成支持，不要分析牌面。");
   }
   sections.push(
-    "examples 与 gold 只是语气和深度的参照，不是这一次的牌。不要照抄其中的牌、处境或句子。问题和处境没有提到的主题，不要从参照里借过来。知识库文字在 cards 里，牌义以那里为准。signals 是计数，不要写进正文。",
+    "examples 与 gold 只是语气和深度的参照，不是这一次的牌。不要照抄其中的牌、处境或句子。问题和处境没有提到的主题，不要从参照里借过来。知识库文字在 cards 里，牌义以那里为准。signals 只有 n、majors、reversed、suits 四个数字，不要写进正文，也不要改写成张数或元素很重。",
   );
 
   const topic = kind === "vague" ? "general" : contextTopic(spread.id, context);
@@ -162,7 +159,6 @@ export function composeReadingPrompt(input: {
       orientation: orientation(line.reversed, locale),
       keywords: line.card.keywords[locale].join(locale === "zh" ? "、" : ", "),
       topicMeaning: line.card.topics[orient][topic][locale],
-      advice: line.card.topics[orient].advice[locale],
       imagery: cardImagery[line.card.id] ?? line.card.description.zh,
     };
   });
@@ -257,7 +253,6 @@ export function selfReviewPrompt(
 
 function signalCounts(cards: DrawnCard[]): ComposedPrompt["user"]["signals"] {
   const suits: Record<string, number> = {};
-  const ranks = new Map<string, number>();
   let majors = 0;
   let reversed = 0;
   for (const drawn of cards) {
@@ -266,15 +261,12 @@ function signalCounts(cards: DrawnCard[]): ComposedPrompt["user"]["signals"] {
     if (!card) continue;
     if (card.arcana === "major") majors += 1;
     else if (card.suit) suits[card.suit] = (suits[card.suit] ?? 0) + 1;
-    if (card.arcana === "minor" && card.rank) ranks.set(card.rank, (ranks.get(card.rank) ?? 0) + 1);
   }
   return {
-    cards: cards.length,
+    n: cards.length,
     majors,
-    minors: cards.length - majors,
     reversed,
     suits,
-    repeatedRanks: [...ranks.entries()].filter(([, count]) => count >= 2).map(([rank]) => rank),
   };
 }
 

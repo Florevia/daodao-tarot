@@ -9,6 +9,7 @@ import {
   type GeminiFailure,
   type GeminiSuccess,
 } from "./gemini";
+import { repairReading } from "./prompt/checks";
 import { selfReviewPrompt, type SelfReviewContext } from "./prompt/compose";
 
 export const ZENMUX_CHAT_URL = "https://zenmux.ai/api/v1/chat/completions";
@@ -221,8 +222,15 @@ export async function requestZenmuxInterpretation(input: {
     return second;
   };
 
-  const first = await once(input.system, input.user);
-  if (!("reading" in first)) return first;
+  const drafted = await once(input.system, input.user);
+  if (!("reading" in drafted)) return drafted;
+  const repaired = await repairReading(drafted.reading, signal, async (note) => {
+    if (signal.aborted) return null;
+    const revised = await once(`${input.system}\n\n${note}`, input.user);
+    if (!("reading" in revised)) return null;
+    return revised.reading;
+  });
+  const first = { reading: repaired };
   if (!input.selfReview || signal.aborted || !input.reviewContext) return first;
   const review = selfReviewPrompt(first.reading, input.locale ?? "zh", input.reviewContext);
   const revised = await once(review.system, review.user);

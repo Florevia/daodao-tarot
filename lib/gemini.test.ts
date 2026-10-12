@@ -22,7 +22,9 @@ describe("gemini", () => {
     assert.deepEqual(thinkingConfigFor("gemini-2.5-flash"), { thinkingBudget: 0 });
     assert.deepEqual(thinkingConfigFor("gemini-3.6-flash"), { thinkingLevel: "low" });
     assert.deepEqual(thinkingConfigFor("gemini-3.8-flash"), { thinkingLevel: "low" });
-    assert.deepEqual(thinkingConfigFor("gemini-flash-latest"), { thinkingLevel: "low" });
+    assert.deepEqual(thinkingConfigFor("gemini-3-flash-preview"), { thinkingLevel: "low" });
+    assert.deepEqual(thinkingConfigFor("gemini-flash-lite-latest"), { thinkingLevel: "low" });
+    assert.deepEqual(thinkingConfigFor("gemini-3.5-flash-lite"), { thinkingLevel: "low" });
     assert.equal(JSON.stringify(thinkingConfigFor("gemini-3.6-flash")).includes("minimal"), false);
   });
 
@@ -183,12 +185,15 @@ describe("gemini", () => {
   });
 
   it("walks the model chain when the primary model is unavailable", async () => {
-    assert.deepEqual(geminiModelChain("gemini-3.6-flash"), [
+    const chain = [
       "gemini-3.6-flash",
       "gemini-3.8-flash",
-      "gemini-flash-latest",
-    ]);
-    assert.deepEqual(geminiModelChain("gemini-3.8-flash"), ["gemini-3.8-flash", "gemini-flash-latest"]);
+      "gemini-3-flash-preview",
+      "gemini-flash-lite-latest",
+      "gemini-3.5-flash-lite",
+    ];
+    assert.deepEqual(geminiModelChain("gemini-3.6-flash"), chain);
+    assert.deepEqual(geminiModelChain("gemini-3.8-flash"), chain.slice(1));
     const positions = [{ id: "past", names: ["过去"] }];
     const calls: string[] = [];
     const levels: string[] = [];
@@ -221,7 +226,7 @@ describe("gemini", () => {
     assert.deepEqual(calls.map((url) => url.split("/models/")[1]?.split(":")[0]), [
       "gemini-3.6-flash",
       "gemini-3.8-flash",
-      "gemini-flash-latest",
+      "gemini-3-flash-preview",
     ]);
     assert.deepEqual(levels, ["low", "low", "low"]);
     assert.equal(JSON.stringify(result).includes("secret-value"), false);
@@ -253,6 +258,9 @@ describe("gemini", () => {
     assert.deepEqual(stopped.map((url) => url.split("/models/")[1]?.split(":")[0]), [
       "gemini-2.5-flash",
       "gemini-3.8-flash",
+      "gemini-3-flash-preview",
+      "gemini-flash-lite-latest",
+      "gemini-3.5-flash-lite",
     ]);
     assert.deepEqual(modelError, { error: "AI_FAILED", reason: "quota" });
 
@@ -268,7 +276,10 @@ describe("gemini", () => {
         return new Response("quota", { status: 429 });
       },
     });
-    assert.deepEqual(quotaCalls.map((url) => url.split("/models/")[1]?.split(":")[0]), ["gemini-3.6-flash"]);
+    assert.deepEqual(
+      quotaCalls.map((url) => url.split("/models/")[1]?.split(":")[0]),
+      chain,
+    );
     assert.deepEqual(quota, { error: "AI_FAILED", reason: "quota" });
 
     let unrelated = 0;
@@ -283,8 +294,90 @@ describe("gemini", () => {
         return new Response("invalid payload", { status: 400 });
       },
     });
-    assert.equal(unrelated, 1);
+    assert.equal(unrelated, 2);
     assert.deepEqual(plain, { error: "AI_FAILED", reason: "upstream" });
+
+    const mixed: string[] = [];
+    const recovered = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "sys",
+      user: {},
+      positions,
+      fetchImpl: async (url) => {
+        mixed.push(String(url));
+        if (mixed.length === 1) return new Response("quota", { status: 429 });
+        return Response.json({
+          candidates: [{ content: { parts: [{ text: JSON.stringify({
+            cards: [{ positionId: "past", body: "过去这一张。" }],
+            connection: "连在一起。",
+            conclusion: "先做一件小事。",
+          }) }] } }],
+        });
+      },
+    });
+    assert.deepEqual(mixed.map((url) => url.split("/models/")[1]?.split(":")[0]), [
+      "gemini-3.6-flash",
+      "gemini-3.8-flash",
+    ]);
+    assert.ok("reading" in recovered);
+  });
+
+  it("rewrites a flagged draft once on the same model", async () => {
+    const positions = [{ id: "past", names: ["过去"] }];
+    const clean = JSON.stringify({
+      cards: [{ positionId: "past", body: "过去这一张。" }],
+      connection: "连在一起。",
+      conclusion: "先做一件小事。",
+    });
+    const dirty = JSON.stringify({
+      overview: "这副牌逆位居多。",
+      cards: [{ positionId: "past", body: "过去这一张。" }],
+      connection: "连在一起。",
+      conclusion: "先做一件小事。",
+    });
+    const calls: string[] = [];
+    const fixed = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "你是叨叨。",
+      user: {},
+      positions,
+      fetchImpl: async (url, init) => {
+        calls.push(String(url));
+        const body = JSON.parse(String(init?.body)) as { systemInstruction: { parts: { text: string }[] } };
+        const system = body.systemInstruction.parts[0]?.text ?? "";
+        if (calls.length === 1) {
+          assert.equal(system.includes("上一稿没有通过检查"), false);
+          return Response.json({ candidates: [{ content: { parts: [{ text: dirty }] } }] });
+        }
+        assert.match(system, /上一稿没有通过检查/);
+        assert.match(system, /这副牌/);
+        assert.match(system, /居多/);
+        return Response.json({ candidates: [{ content: { parts: [{ text: clean }] } }] });
+      },
+    });
+    assert.equal(calls.length, 2);
+    assert.ok(calls.every((url) => url.includes("models/gemini-3.6-flash:")));
+    assert.ok("reading" in fixed);
+    if ("reading" in fixed) assert.equal(fixed.reading.overview, undefined);
+
+    let keptCalls = 0;
+    const kept = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "你是叨叨。",
+      user: {},
+      positions,
+      fetchImpl: async () => {
+        keptCalls += 1;
+        if (keptCalls === 1) return Response.json({ candidates: [{ content: { parts: [{ text: dirty }] } }] });
+        return new Response("quota", { status: 429 });
+      },
+    });
+    assert.equal(keptCalls, 2);
+    assert.ok("reading" in kept);
+    if ("reading" in kept) assert.match(kept.reading.overview ?? "", /这副牌/);
   });
 
   it("does not start the next model after the shared deadline", async () => {

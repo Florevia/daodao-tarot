@@ -60,7 +60,7 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | `DATABASE_URL` | 必须 | Postgres 连接串。本地见 `.env.example`。生产环境用直连（不要用连接池地址），并带上服务商要求的 `sslmode`。 |
 | `AUTH_SECRET` | 生产必须 | 用来签名登录 cookie。本地可以沿用 `.env.example` 里的开发值。 |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | 可选 | 没有 ZenMux 密钥时，翻开牌后会请 Gemini 按知识库写一份解牌。`GEMINI_API_KEY` 是同一密钥的别名。没有密钥、调用失败或超过每小时次数时，改用内置牌义。 |
-| `GEMINI_MODEL` | 可选 | 默认 `gemini-3.6-flash`。若该模型不可用，会再试 `gemini-3.8-flash`，然后 `gemini-flash-latest`。额度用尽（429）时不再换模型。 |
+| `GEMINI_MODEL` | 可选 | 默认 `gemini-3.6-flash`。不可用或该模型额度用尽（429）时，按顺序再试 `gemini-3.8-flash`、`gemini-3-flash-preview`、`gemini-flash-lite-latest`、`gemini-3.5-flash-lite`。同一种非额度错误出现第二次就停止。全部额度用尽时仍回退到内置牌义。 |
 | `ZENMUX_API_KEY` | 可选 | 设置后优先走 ZenMux（OpenAI 兼容接口 `https://zenmux.ai/api/v1/chat/completions`），用同一套解牌提示和 JSON 结构。 |
 | `ZENMUX_MODEL` | 可选 | 默认 `anthropic/claude-haiku-5.5`。 |
 | `AI_PROVIDER` | 可选 | `gemini` 或 `zenmux`。两边都有密钥时，用它指定走哪一家；不设置则有 ZenMux 密钥就用 ZenMux。 |
@@ -73,7 +73,7 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | `DATABASE_URL` | Yes | Postgres connection string. Local value is in `.env.example`. In production use the direct URL, not a pooler, and include the provider's `sslmode`. |
 | `AUTH_SECRET` | Yes in production | Signs the session cookie. The example value is fine for local development. |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | No | When no ZenMux key is set, revealing the cards asks Gemini for one reading grounded in the knowledge base. `GEMINI_API_KEY` is an alias. With no key, a failed call, or the hourly limit, the built-in reading is shown instead. |
-| `GEMINI_MODEL` | No | Defaults to `gemini-3.6-flash`. If that model is unavailable, the server tries `gemini-3.8-flash`, then `gemini-flash-latest`. A 429 stops the chain. |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.6-flash`. If that model is unavailable or returns 429, the server tries `gemini-3.8-flash`, `gemini-3-flash-preview`, `gemini-flash-lite-latest`, then `gemini-3.5-flash-lite`. The same non-quota error twice stops the chain. If every model is out of quota, the built-in reading is shown. |
 | `ZENMUX_API_KEY` | No | When set, readings use ZenMux (OpenAI-compatible `https://zenmux.ai/api/v1/chat/completions`) with the same prompt and JSON shape. |
 | `ZENMUX_MODEL` | No | Defaults to `anthropic/claude-haiku-5.5`. |
 | `AI_PROVIDER` | No | `gemini` or `zenmux`. When both keys exist, this chooses the provider. Unset, a ZenMux key wins. |

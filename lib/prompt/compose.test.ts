@@ -59,10 +59,20 @@ describe("prompt composition", () => {
     assert.equal("inPosition" in composed.user.cards[0], false);
     assert.equal(JSON.stringify(composed.user).includes("在这里的读法是"), false);
     assert.equal(JSON.stringify(composed.user).includes("这件事主要在"), false);
-    assert.equal(composed.user.signals.cards, 6);
-    assert.equal(composed.user.signals.reversed, 3);
+    assert.deepEqual(composed.user.signals, {
+      n: 6,
+      majors: 2,
+      reversed: 3,
+      suits: { wands: 2, pentacles: 1, swords: 1 },
+    });
+    assert.equal(Object.hasOwn(composed.user.cards[0] ?? {}, "advice"), false);
     assert.equal(JSON.stringify(composed.user.signals).includes("过半"), false);
     assert.match(composed.system, /不要写出张数/);
+    assert.match(composed.system, /大牌/);
+    assert.match(composed.system, /托出了日常/);
+    assert.match(composed.system, /这副牌/);
+    assert.match(composed.system, /若照现在的做法/);
+    assert.match(composed.system, /在你感受里他像/);
     assert.match(composed.system, /立于不败之地/);
     assert.equal(composed.user.gold.some((item) => item.id === "gold-third"), false);
     for (const item of composed.user.examples.items) {
@@ -98,6 +108,9 @@ describe("prompt composition", () => {
     assert.ok(composed.skills.includes("skills/techniques/combinations.md"));
     assert.match(composed.system, /恋人与恶魔/);
     assert.ok(composed.skills.includes("skills/topics/love.md"));
+    assert.match(composed.system, /牌给不出一个是或否/);
+    assert.match(composed.system, /不要往离开那边倾斜/);
+    assert.match(composed.system, /该不该分手/);
   });
 
   it("treats crisis language as support, not a reading topic", () => {
@@ -150,6 +163,10 @@ describe("prompt composition", () => {
     assert.ok(newChars > oldChars, `${newChars} vs ${oldChars}`);
     assert.ok(newChars < 36000, String(newChars));
     assert.match(composed.system, /凯尔特十字/);
+    assert.match(composed.system, /垂直轴/);
+    assert.match(composed.system, /时间轴/);
+    assert.match(composed.system, /staff/);
+    assert.match(composed.system, /两到四个画面/);
     assert.ok(selectGoldReadings("celtic", { area: "love" })[0]?.spreadId === "celtic");
     const review = selfReviewTemplate(DEFAULT_GEMINI_MODEL);
     assert.equal(review.model, "gemini-3.6-flash");
