@@ -12,6 +12,8 @@ import {
   selfReviewTemplate,
 } from "../lib/gemini";
 import { composeReadingPrompt, promptChars } from "../lib/prompt/compose";
+import { buildCrisisReading } from "../lib/prompt/crisis";
+import { detectQuestionKind } from "../lib/prompt/detect";
 import type { ReadingContext } from "../lib/reading-context";
 import { getSpread } from "../lib/spreads";
 import type { DrawnCard } from "../lib/shuffle";
@@ -57,12 +59,28 @@ for (const item of cases) {
     context: item.context,
     cards: item.cards,
   });
+  writeFileSync(join(dir, `${item.id}.old.json`), `${JSON.stringify(oldRequest, null, 2)}\n`);
+  if (detectQuestionKind(item.question) === "crisis") {
+    const skipped = {
+      model: DEFAULT_GEMINI_MODEL,
+      skipped: "server-crisis-response",
+      reason: "The route returns this reading and does not call Gemini.",
+      response: { reading: buildCrisisReading(spread.positions, item.locale) },
+    };
+    writeFileSync(join(dir, `${item.id}.new.json`), `${JSON.stringify(skipped, null, 2)}\n`);
+    sizes.cases.push({
+      id: item.id,
+      oldChars: promptChars(old.system, old.user),
+      newChars: 0,
+      skills: ["server-crisis-response"],
+    });
+    continue;
+  }
   const newRequest = generateContentRequest({
     model: DEFAULT_GEMINI_MODEL,
     system: composed.system,
     user: composed.user,
   });
-  writeFileSync(join(dir, `${item.id}.old.json`), `${JSON.stringify(oldRequest, null, 2)}\n`);
   writeFileSync(join(dir, `${item.id}.new.json`), `${JSON.stringify(newRequest, null, 2)}\n`);
   sizes.cases.push({
     id: item.id,
@@ -75,6 +93,9 @@ for (const item of cases) {
 writeFileSync(join(dir, "self-review-template.json"), `${JSON.stringify(selfReviewTemplate(DEFAULT_GEMINI_MODEL), null, 2)}\n`);
 writeFileSync(join(process.cwd(), "evals/sizes.json"), `${JSON.stringify(sizes, null, 2)}\n`);
 
+const called = sizes.cases.filter((item) => item.newChars > 0);
 const oldAvg = Math.round(sizes.cases.reduce((sum, item) => sum + item.oldChars, 0) / sizes.cases.length);
-const newAvg = Math.round(sizes.cases.reduce((sum, item) => sum + item.newChars, 0) / sizes.cases.length);
-console.log(`Exported ${sizes.cases.length} eval requests. model=${DEFAULT_GEMINI_MODEL} oldAvg=${oldAvg} newAvg=${newAvg}`);
+const newAvg = Math.round(called.reduce((sum, item) => sum + item.newChars, 0) / called.length);
+console.log(
+  `Exported ${sizes.cases.length} eval requests. model=${DEFAULT_GEMINI_MODEL} oldAvg=${oldAvg} newAvg=${newAvg} (crisis cases are not sent)`,
+);

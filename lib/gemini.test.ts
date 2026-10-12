@@ -253,9 +253,23 @@ describe("gemini", () => {
     assert.deepEqual(stopped.map((url) => url.split("/models/")[1]?.split(":")[0]), [
       "gemini-2.5-flash",
       "gemini-3.8-flash",
-      "gemini-flash-latest",
     ]);
-    assert.deepEqual(modelError, { error: "AI_FAILED", reason: "upstream" });
+    assert.deepEqual(modelError, { error: "AI_FAILED", reason: "quota" });
+
+    const quotaCalls: string[] = [];
+    const quota = await requestGeminiInterpretation({
+      apiKey: "secret-value",
+      model: "gemini-3.6-flash",
+      system: "sys",
+      user: {},
+      positions,
+      fetchImpl: async (url) => {
+        quotaCalls.push(String(url));
+        return new Response("quota", { status: 429 });
+      },
+    });
+    assert.deepEqual(quotaCalls.map((url) => url.split("/models/")[1]?.split(":")[0]), ["gemini-3.6-flash"]);
+    assert.deepEqual(quota, { error: "AI_FAILED", reason: "quota" });
 
     let unrelated = 0;
     const plain = await requestGeminiInterpretation({

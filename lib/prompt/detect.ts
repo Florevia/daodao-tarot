@@ -39,10 +39,20 @@ export function detectQuestionKind(question: string): QuestionKind | null {
   }
   if (/什么时候|何时|多久|哪一天|哪个月|when will|how long|什么时间/.test(text)) return "timing";
   if (/该不该|要不要|是不是|会不会|能不能|是否|yes or no|should i/i.test(text)) return "yes-no";
-  if (text.length <= 6 || /就那样|不知道问|说不清|没想好|没有写下|随便看看|no specific question|not sure what/i.test(text)) {
-    return "vague";
-  }
+  if (isVagueQuestion(text)) return "vague";
   return null;
+}
+
+/**
+ * Only an empty question or a shrug such as “就那样吧”.
+ * A longer question that merely contains “说不清” is a real question.
+ */
+export function isVagueQuestion(question: string): boolean {
+  const bare = question.replace(/[。！？!?…~\s"'“”‘’（）()]/g, "");
+  if (!bare) return true;
+  return /^(?:就那样吧?|就这样吧?|不知道问什么|不知道问|不知道|说不清|说不清楚|没想好|没有写下具体问题|没写下问题|随便看看|随便|嗯+|啊+|无|没有具体问题|nospecificquestion|notsurewhat(?:toask)?|whatever|idk|idontknow)$/i.test(
+    bare,
+  );
 }
 
 export function topicSkill(spreadId: string, context: ReadingContext): string | null {
@@ -100,4 +110,12 @@ const questionFiles: Record<QuestionKind, string | null> = {
 export function questionSkill(kind: QuestionKind | null): string | null {
   if (!kind) return null;
   return questionFiles[kind];
+}
+
+/** A single-card draw overlaps on that card. Longer draws overlap at two shared cards. */
+export function drawsOverlap(referenceIds: readonly string[], drawnIds: readonly string[]): boolean {
+  const drawn = new Set(drawnIds);
+  const shared = new Set(referenceIds.filter((id) => drawn.has(id)));
+  if (drawnIds.length <= 1) return shared.size >= 1;
+  return shared.size >= 2;
 }

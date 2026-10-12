@@ -1,7 +1,7 @@
 import { parseAiReading, type AiReading } from "./ai-reading";
 import type { Locale } from "./cards";
 import { exampleLabel, examplesForPrompt, selectExampleCases, type PromptExample } from "./cases";
-import { selfReviewPrompt } from "./prompt/compose";
+import { selfReviewPrompt, type SelfReviewContext } from "./prompt/compose";
 import { contextLabel, contextTopic, type ReadingContext } from "./reading-context";
 import type { Spread } from "./spreads";
 import type { DrawnCard } from "./shuffle";
@@ -13,7 +13,7 @@ export const INTERPRET_HOURLY_LIMIT = 30;
 /** Current flash model that still accepts new keys and handles Chinese. Override with GEMINI_MODEL. */
 export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 
-/** Tried, in order, when the chosen model is missing, overloaded, or rate-limited. */
+/** Tried, in order, when the chosen model is missing or overloaded. A 429 stops the chain. */
 export const GEMINI_FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"] as const;
 
 /**
@@ -23,7 +23,7 @@ export const GEMINI_FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"
  */
 export const GEMINI_TIMEOUT_MS = 90_000;
 
-export type GeminiFailReason = "timeout" | "upstream" | "empty";
+export type GeminiFailReason = "timeout" | "upstream" | "empty" | "quota";
 
 export type GeminiFailure = { error: "AI_FAILED"; reason: GeminiFailReason };
 
@@ -67,7 +67,7 @@ export function thinkingConfigFor(model: string): { thinkingBudget: number } | {
 }
 
 function modelUnavailable(status: number, body: string): boolean {
-  if (status === 404 || status === 429 || status === 503) return true;
+  if (status === 404 || status === 503) return true;
   if (status !== 400) return false;
   return /model|thinking|no longer available|not supported|not found/i.test(body);
 }
@@ -216,7 +216,22 @@ export function selfReviewTemplate(model = DEFAULT_GEMINI_MODEL): { model: strin
     connection: "<<FIRST_RESPONSE_CONNECTION>>",
     conclusion: "<<FIRST_RESPONSE_CONCLUSION>>",
   };
-  const review = selfReviewPrompt(draft, "zh");
+  const review = selfReviewPrompt(draft, "zh", {
+    question: "<<QUESTION>>",
+    situation: "<<SITUATION>>",
+    spread: "<<SPREAD>>",
+    positions: [{ id: "<<POSITION_ID>>", name: "<<POSITION_NAME>>", asks: "<<POSITION_ASKS>>" }],
+    cards: [
+      {
+        positionId: "<<POSITION_ID>>",
+        card: "<<CARD_NAME>>",
+        orientation: "<<ORIENTATION>>",
+        keywords: "<<KEYWORDS>>",
+        meaning: "<<KNOWLEDGE_BASE_MEANING>>",
+      },
+    ],
+    crisis: false,
+  });
   return generateContentRequest({
     model,
     system: review.system,
@@ -236,6 +251,7 @@ export async function requestGeminiInterpretation(input: {
   schema?: typeof legacyResponseSchema | typeof readingResponseSchema;
   selfReview?: boolean;
   locale?: Locale;
+  reviewContext?: SelfReviewContext;
 }): Promise<GeminiSuccess | GeminiFailure> {
   const timeoutMs = input.timeoutMs ?? GEMINI_TIMEOUT_MS;
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -257,6 +273,10 @@ export async function requestGeminiInterpretation(input: {
           signal,
         },
       );
+      if (response.status === 429) {
+        await response.body?.cancel().catch(() => undefined);
+        return { error: "AI_FAILED", reason: "quota" };
+      }
       if (!response.ok) {
         const body = response.status === 400 ? await response.text().catch(() => "") : "";
         if (response.status !== 400) await response.body?.cancel().catch(() => undefined);
@@ -285,8 +305,8 @@ export async function requestGeminiInterpretation(input: {
     break;
   }
   if (!first) return { error: "AI_FAILED", reason: "upstream" };
-  if (!input.selfReview || signal.aborted) return first;
-  const review = selfReviewPrompt(first.reading, input.locale ?? "zh");
+  if (!input.selfReview || signal.aborted || !input.reviewContext) return first;
+  const review = selfReviewPrompt(first.reading, input.locale ?? "zh", input.reviewContext);
   const revised = await once(usedModel, review.system, review.user);
   if (revised !== "unavailable" && "reading" in revised) return revised;
   return first;

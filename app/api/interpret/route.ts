@@ -5,7 +5,9 @@ import {
   readingResponseSchema,
   requestGeminiInterpretation,
 } from "@/lib/gemini";
-import { composeReadingPrompt, selfReviewEnabled } from "@/lib/prompt/compose";
+import { composeReadingPrompt, reviewContextFrom, selfReviewEnabled } from "@/lib/prompt/compose";
+import { buildCrisisReading } from "@/lib/prompt/crisis";
+import { detectQuestionKind } from "@/lib/prompt/detect";
 import { sanitizeContext } from "@/lib/reading-context";
 import { validateDrawnCards } from "@/lib/reading-record";
 import { getSpread } from "@/lib/spreads";
@@ -61,9 +63,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   await connection();
-  const key = geminiApiKey();
-  if (!key) return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
-  if (limited(request)) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
   const body = await request.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success || !validateDrawnCards(parsed.data.spreadId, parsed.data.cards)) {
@@ -74,7 +73,13 @@ export async function POST(request: Request) {
   const locale = parsed.data.locale;
   const context = sanitizeContext(parsed.data.spreadId, parsed.data.context);
   const question = parsed.data.question?.trim() || (locale === "zh" ? "（没有写下具体问题）" : "(no specific question)");
-  const { system, user } = composeReadingPrompt({
+  if (detectQuestionKind(question) === "crisis") {
+    return Response.json({ reading: buildCrisisReading(spread.positions, locale) });
+  }
+  const key = geminiApiKey();
+  if (!key) return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
+  if (limited(request)) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
+  const composed = composeReadingPrompt({
     question,
     spread,
     locale,
@@ -84,8 +89,8 @@ export async function POST(request: Request) {
   const result = await requestGeminiInterpretation({
     apiKey: key,
     model: geminiModel(),
-    system,
-    user,
+    system: composed.system,
+    user: composed.user,
     positions: spread.positions.map((position) => ({
       id: position.id,
       names: [position.name.zh, position.name.en],
@@ -93,6 +98,7 @@ export async function POST(request: Request) {
     schema: readingResponseSchema,
     selfReview: selfReviewEnabled(),
     locale,
+    reviewContext: reviewContextFrom(composed, spread, locale),
   });
   if ("reading" in result) return Response.json(result);
   return Response.json(result, { status: 502 });

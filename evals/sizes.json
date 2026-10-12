@@ -3,8 +3,8 @@
   "cases": [
     {
       "id": "eval-single-day",
-      "oldChars": 2024,
-      "newChars": 6622,
+      "oldChars": 2007,
+      "newChars": 6866,
       "skills": [
         "skills/spreads/single.md",
         "skills/techniques/imagery.md"
@@ -12,8 +12,8 @@
     },
     {
       "id": "eval-three-love",
-      "oldChars": 3685,
-      "newChars": 8023,
+      "oldChars": 3686,
+      "newChars": 7938,
       "skills": [
         "skills/spreads/three.md",
         "skills/topics/love.md",
@@ -22,34 +22,29 @@
     },
     {
       "id": "eval-three-money-timing",
-      "oldChars": 3616,
-      "newChars": 8360,
+      "oldChars": 3607,
+      "newChars": 7873,
       "skills": [
         "skills/spreads/three.md",
         "skills/topics/money.md",
-        "skills/techniques/reversals.md",
         "skills/techniques/imagery.md",
         "skills/questions/timing.md"
       ]
     },
     {
       "id": "eval-three-crisis",
-      "oldChars": 3725,
-      "newChars": 8258,
+      "oldChars": 3710,
+      "newChars": 0,
       "skills": [
-        "skills/spreads/three.md",
-        "skills/topics/health.md",
-        "skills/techniques/elements.md",
-        "skills/techniques/imagery.md"
+        "server-crisis-response"
       ]
     },
     {
       "id": "eval-three-vague",
-      "oldChars": 3619,
-      "newChars": 8421,
+      "oldChars": 3606,
+      "newChars": 8053,
       "skills": [
         "skills/spreads/three.md",
-        "skills/techniques/reversals.md",
         "skills/techniques/elements.md",
         "skills/techniques/imagery.md",
         "skills/questions/vague.md"
@@ -57,31 +52,35 @@
     },
     {
       "id": "eval-love-single",
-      "oldChars": 6358,
-      "newChars": 11748,
+      "oldChars": 6313,
+      "newChars": 12040,
       "skills": [
         "skills/spreads/love.md",
         "skills/topics/love.md",
+        "skills/techniques/reversals.md",
+        "skills/techniques/court-cards.md",
         "skills/techniques/elements.md",
         "skills/techniques/imagery.md"
       ]
     },
     {
       "id": "eval-love-talking",
-      "oldChars": 6309,
-      "newChars": 12018,
+      "oldChars": 6266,
+      "newChars": 12237,
       "skills": [
         "skills/spreads/love.md",
         "skills/topics/love.md",
+        "skills/techniques/reversals.md",
         "skills/techniques/court-cards.md",
+        "skills/techniques/elements.md",
         "skills/techniques/imagery.md",
         "skills/questions/yes-no.md"
       ]
     },
     {
       "id": "eval-love-dating-yes",
-      "oldChars": 6301,
-      "newChars": 12808,
+      "oldChars": 6317,
+      "newChars": 12247,
       "skills": [
         "skills/spreads/love.md",
         "skills/topics/love.md",
@@ -94,25 +93,26 @@
     },
     {
       "id": "eval-love-partnered",
-      "oldChars": 6545,
-      "newChars": 13232,
+      "oldChars": 6466,
+      "newChars": 12165,
       "skills": [
         "skills/spreads/love.md",
         "skills/topics/love.md",
         "skills/techniques/reversals.md",
         "skills/techniques/court-cards.md",
-        "skills/techniques/combinations.md",
+        "skills/techniques/elements.md",
         "skills/techniques/imagery.md"
       ]
     },
     {
       "id": "eval-love-return",
-      "oldChars": 6261,
-      "newChars": 12419,
+      "oldChars": 6360,
+      "newChars": 12686,
       "skills": [
         "skills/spreads/love.md",
         "skills/topics/love.md",
-        "skills/techniques/court-cards.md",
+        "skills/techniques/reversals.md",
+        "skills/techniques/combinations.md",
         "skills/techniques/elements.md",
         "skills/techniques/imagery.md",
         "skills/questions/will-they-return.md"
@@ -120,58 +120,44 @@
     },
     {
       "id": "eval-love-third",
-      "oldChars": 6256,
-      "newChars": 13121,
+      "oldChars": 6220,
+      "newChars": 11432,
       "skills": [
         "skills/spreads/love.md",
         "skills/topics/love.md",
-        "skills/techniques/reversals.md",
-        "skills/techniques/combinations.md",
-        "skills/techniques/elements.md",
+        "skills/techniques/court-cards.md",
         "skills/techniques/imagery.md",
         "skills/questions/third-party.md"
       ]
     },
     {
       "id": "eval-career-steady",
-      "oldChars": 5425,
-      "newChars": 10947,
+      "oldChars": 5363,
+      "newChars": 10517,
       "skills": [
         "skills/spreads/career.md",
         "skills/topics/career.md",
+        "skills/techniques/reversals.md",
         "skills/techniques/court-cards.md",
-        "skills/techniques/elements.md",
         "skills/techniques/imagery.md"
       ]
     },
     {
       "id": "eval-career-switching",
-      "oldChars": 5317,
-      "newChars": 10991,
+      "oldChars": 5400,
+      "newChars": 10237,
       "skills": [
         "skills/spreads/career.md",
         "skills/topics/career.md",
         "skills/techniques/reversals.md",
-        "skills/techniques/elements.md",
         "skills/techniques/imagery.md",
         "skills/questions/yes-no.md"
       ]
     },
     {
       "id": "eval-career-seeking",
-      "oldChars": 5388,
-      "newChars": 10512,
-      "skills": [
-        "skills/spreads/career.md",
-        "skills/topics/career.md",
-        "skills/techniques/elements.md",
-        "skills/techniques/imagery.md"
-      ]
-    },
-    {
-      "id": "eval-career-freelance",
-      "oldChars": 5370,
-      "newChars": 10877,
+      "oldChars": 5478,
+      "newChars": 10599,
       "skills": [
         "skills/spreads/career.md",
         "skills/topics/career.md",
@@ -181,12 +167,24 @@
       ]
     },
     {
-      "id": "eval-career-student",
-      "oldChars": 5338,
-      "newChars": 10865,
+      "id": "eval-career-freelance",
+      "oldChars": 5351,
+      "newChars": 10059,
       "skills": [
         "skills/spreads/career.md",
         "skills/topics/career.md",
+        "skills/techniques/reversals.md",
+        "skills/techniques/imagery.md"
+      ]
+    },
+    {
+      "id": "eval-career-student",
+      "oldChars": 5382,
+      "newChars": 10890,
+      "skills": [
+        "skills/spreads/career.md",
+        "skills/topics/career.md",
+        "skills/techniques/reversals.md",
         "skills/techniques/court-cards.md",
         "skills/techniques/elements.md",
         "skills/techniques/imagery.md"
@@ -194,8 +192,8 @@
     },
     {
       "id": "eval-celtic-love",
-      "oldChars": 7689,
-      "newChars": 15123,
+      "oldChars": 7681,
+      "newChars": 13985,
       "skills": [
         "skills/spreads/celtic.md",
         "skills/topics/love.md",
@@ -207,15 +205,15 @@
     },
     {
       "id": "eval-celtic-career",
-      "oldChars": 7577,
-      "newChars": 14447,
+      "oldChars": 7586,
+      "newChars": 13550,
       "skills": [
         "skills/spreads/celtic.md",
         "skills/topics/career.md",
+        "skills/techniques/reversals.md",
         "skills/techniques/court-cards.md",
         "skills/techniques/elements.md",
-        "skills/techniques/imagery.md",
-        "skills/questions/vague.md"
+        "skills/techniques/imagery.md"
       ]
     }
   ]

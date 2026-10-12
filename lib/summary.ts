@@ -356,10 +356,10 @@ function themeBlock(lines: ReadingLine[], locale: Locale): string {
     locale === "zh"
       ? reversals === 0
         ? "没有逆位，能量大体向外、向前。"
-        : `有 ${reversals} 张逆位。${reversals >= Math.ceil(total / 2) ? "逆位过半，先处理阻滞、过度或没说出口的部分，再谈推进。" : "逆位不多，提醒你有些地方要放慢或转个角度。"}`
+        : `有 ${reversals} 张逆位。${reversals * 2 > total ? "逆位过半，先处理阻滞、过度或没说出口的部分，再谈推进。" : "逆位不多，提醒你有些地方要放慢或转个角度。"}`
       : reversals === 0
         ? "Nothing is reversed, so the energy mostly moves outward and forward."
-        : `${reversals} card${reversals === 1 ? " is" : "s are"} reversed. ${reversals >= Math.ceil(total / 2) ? "Reversals are the majority: tend the block, the excess, or the unspoken part before you push." : "The reversals are few. They ask for a slower step or a change of angle."}`;
+        : `${reversals} card${reversals === 1 ? " is" : "s are"} reversed. ${reversals * 2 > total ? "Reversals are the majority: tend the block, the excess, or the unspoken part before you push." : "The reversals are few. They ask for a slower step or a change of angle."}`;
 
   const ids = new Set(lines.map((line) => line.card.id));
   const pairs = pairNotes.filter((pair) => pair.ids.every((id) => ids.has(id))).map((pair) => pair[locale]);

@@ -4,10 +4,14 @@
 
 ## 长度
 
-- 每日一牌：overview 一两句；牌三到五句；connection 两句，把这一天收束；conclusion 一句。
-- 三牌：overview 两句；每张两到四句；connection 三到五句；conclusion 一两句。
-- 关系、事业：overview 两到三句；每张两到四句；connection 四到六句；conclusion 一两句。
-- 凯尔特十字：overview 三句以内；每张两到三句，避免十段同样长；connection 五到八句，按轴线来写，不要十张各一句；conclusion 一两句。
+- 每日一牌：overview 一两句；牌三到五句；connection 两句，把这一天收束；conclusion 恰好一句、一个动作。
+- 三牌：overview 两句；每张两到四句；connection 三到五句；conclusion 恰好一句、一个动作。
+- 关系、事业：overview 两到三句；每张两到四句；connection 四到六句；conclusion 恰好一句、一个动作。
+- 凯尔特十字：overview 三句以内；每张两到三句，避免十段同样长；connection 五到八句，按轴线来写，不要十张各一句；conclusion 恰好一句、一个动作。
+
+## 结语只有一个动作
+
+conclusion 只留今天最先做的那一步。不要把两三个建议叠在一起。若写了“然后”“同时”“另外”“再”，删到只剩第一件。
 
 ## 语气
 
@@ -26,6 +30,10 @@
 - 事业上，三支持合作与扩展、七是评估与守住、五是冲突与失去舒适
 - 仅供娱乐、娱乐与自我反思、for entertainment
 - 绝对会、一定会、注定、保证回本、诊断、判决
+- 立于不败之地
+- 证实了、恰好证实
+- 正是……的原因
+- 列出……
 
 ## 好和坏
 

@@ -204,10 +204,10 @@ export function ReadingFlow() {
           body: JSON.stringify(payload),
           signal: controller.signal,
         });
-        const data = (await response.json()) as { reading?: AiReading; error?: string };
+        const data = (await response.json()) as { reading?: AiReading; error?: string; reason?: string };
         if (controller.signal.aborted) return;
         if (!response.ok || !data.reading) {
-          setFailReason(data.error ?? "");
+          setFailReason(data.reason ?? data.error ?? "");
           setAnswerState("fallback");
           return;
         }
@@ -613,9 +613,9 @@ export function ReadingPanels({
           {view.kind === "fallback" ? (
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <p className="text-sm text-muted-foreground" data-testid="fallback-note">
-                {view.reason === "RATE_LIMIT" ? t.aiRate : t.fallbackNote}
+                {view.reason === "RATE_LIMIT" ? t.aiRate : view.reason === "quota" ? t.aiQuota : t.fallbackNote}
               </p>
-              {onRetry ? (
+              {onRetry && view.reason !== "quota" ? (
                 <Button variant="outline" className="h-9" onClick={onRetry} data-testid="retry-reading">
                   {t.retryReading}
                 </Button>
