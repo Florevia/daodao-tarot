@@ -1,10 +1,5 @@
-import {
-  INTERPRET_HOURLY_LIMIT,
-  geminiApiKey,
-  geminiModel,
-  readingResponseSchema,
-  requestGeminiInterpretation,
-} from "@/lib/gemini";
+import { resolveAiProvider, requestAiInterpretation } from "@/lib/ai-provider";
+import { INTERPRET_HOURLY_LIMIT, readingResponseSchema } from "@/lib/gemini";
 import { composeReadingPrompt, reviewContextFrom, selfReviewEnabled } from "@/lib/prompt/compose";
 import { buildCrisisReading } from "@/lib/prompt/crisis";
 import { detectQuestionKind } from "@/lib/prompt/detect";
@@ -15,7 +10,7 @@ import type { DrawnCard } from "@/lib/shuffle";
 import { connection } from "next/server";
 import { z } from "zod";
 
-/** Above the 90s Gemini fetch, under the 300s Vercel hobby ceiling. */
+/** Above the 90s model fetch, under the 300s Vercel hobby ceiling. */
 export const maxDuration = 120;
 
 const cardSchema = z.object({
@@ -58,7 +53,8 @@ function limited(request: Request): boolean {
 
 export async function GET() {
   await connection();
-  return Response.json({ available: Boolean(geminiApiKey()) });
+  const provider = resolveAiProvider();
+  return Response.json({ available: Boolean(provider), provider: provider?.id ?? null });
 }
 
 export async function POST(request: Request) {
@@ -76,8 +72,8 @@ export async function POST(request: Request) {
   if (detectQuestionKind(question) === "crisis") {
     return Response.json({ reading: buildCrisisReading(spread.positions, locale) });
   }
-  const key = geminiApiKey();
-  if (!key) return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
+  const provider = resolveAiProvider();
+  if (!provider) return Response.json({ error: "AI_UNAVAILABLE" }, { status: 503 });
   if (limited(request)) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
   const composed = composeReadingPrompt({
     question,
@@ -86,9 +82,8 @@ export async function POST(request: Request) {
     context,
     cards: parsed.data.cards as DrawnCard[],
   });
-  const result = await requestGeminiInterpretation({
-    apiKey: key,
-    model: geminiModel(),
+  const result = await requestAiInterpretation({
+    provider,
     system: composed.system,
     user: composed.user,
     positions: spread.positions.map((position) => ({

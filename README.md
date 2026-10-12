@@ -59,8 +59,11 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | --- | --- | --- |
 | `DATABASE_URL` | 必须 | Postgres 连接串。本地见 `.env.example`。生产环境用直连（不要用连接池地址），并带上服务商要求的 `sslmode`。 |
 | `AUTH_SECRET` | 生产必须 | 用来签名登录 cookie。本地可以沿用 `.env.example` 里的开发值。 |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | 可选 | 有密钥时，翻开牌后会自动请 Gemini 按知识库写一份解牌。`GEMINI_API_KEY` 是同一密钥的别名。没有密钥、调用失败或超过每小时次数时，改用内置牌义。 |
-| `GEMINI_MODEL` | 可选 | 默认 `gemini-3.6-flash`。若该模型不可用，会再试 `gemini-3.8-flash`，然后 `gemini-flash-latest`。 |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | 可选 | 没有 ZenMux 密钥时，翻开牌后会请 Gemini 按知识库写一份解牌。`GEMINI_API_KEY` 是同一密钥的别名。没有密钥、调用失败或超过每小时次数时，改用内置牌义。 |
+| `GEMINI_MODEL` | 可选 | 默认 `gemini-3.6-flash`。若该模型不可用，会再试 `gemini-3.8-flash`，然后 `gemini-flash-latest`。额度用尽（429）时不再换模型。 |
+| `ZENMUX_API_KEY` | 可选 | 设置后优先走 ZenMux（OpenAI 兼容接口 `https://zenmux.ai/api/v1/chat/completions`），用同一套解牌提示和 JSON 结构。 |
+| `ZENMUX_MODEL` | 可选 | 默认 `anthropic/claude-haiku-5.5`。 |
+| `AI_PROVIDER` | 可选 | `gemini` 或 `zenmux`。两边都有密钥时，用它指定走哪一家；不设置则有 ZenMux 密钥就用 ZenMux。 |
 | `NEXT_PUBLIC_SITE_URL` | 生产建议 | 站点公开地址，用于 sitemap 和 Open Graph。例如 `https://your-domain.vercel.app`。 |
 
 ## Environment variables
@@ -69,13 +72,16 @@ Open [http://127.0.0.1:4178](http://127.0.0.1:4178).
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres connection string. Local value is in `.env.example`. In production use the direct URL, not a pooler, and include the provider's `sslmode`. |
 | `AUTH_SECRET` | Yes in production | Signs the session cookie. The example value is fine for local development. |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | No | When set, revealing the cards asks Gemini for one reading grounded in the knowledge base. `GEMINI_API_KEY` is an alias. With no key, a failed call, or the hourly limit, the built-in reading is shown instead. |
-| `GEMINI_MODEL` | No | Defaults to `gemini-3.6-flash`. If that model is unavailable, the server tries `gemini-3.8-flash`, then `gemini-flash-latest`. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | No | When no ZenMux key is set, revealing the cards asks Gemini for one reading grounded in the knowledge base. `GEMINI_API_KEY` is an alias. With no key, a failed call, or the hourly limit, the built-in reading is shown instead. |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.6-flash`. If that model is unavailable, the server tries `gemini-3.8-flash`, then `gemini-flash-latest`. A 429 stops the chain. |
+| `ZENMUX_API_KEY` | No | When set, readings use ZenMux (OpenAI-compatible `https://zenmux.ai/api/v1/chat/completions`) with the same prompt and JSON shape. |
+| `ZENMUX_MODEL` | No | Defaults to `anthropic/claude-haiku-5.5`. |
+| `AI_PROVIDER` | No | `gemini` or `zenmux`. When both keys exist, this chooses the provider. Unset, a ZenMux key wins. |
 | `NEXT_PUBLIC_SITE_URL` | Recommended in production | Public origin used by the sitemap and Open Graph tags, for example `https://your-domain.vercel.app`. |
 
 ## 部署到 Vercel
 
-Prisma 已经使用 PostgreSQL。不要改构建命令：Vercel 的 Next.js 默认会执行 `npm run build`。这个脚本会 `prisma generate`，在 `DATABASE_URL` 有值时执行 `prisma migrate deploy`，然后 `next build`。没有 `DATABASE_URL` 时会跳过迁移，方便在没有数据库的环境里只做编译检查。Gemini 密钥不参与构建，不设置也能完整占卜。
+Prisma 已经使用 PostgreSQL。不要改构建命令：Vercel 的 Next.js 默认会执行 `npm run build`。这个脚本会 `prisma generate`，在 `DATABASE_URL` 有值时执行 `prisma migrate deploy`，然后 `next build`。没有 `DATABASE_URL` 时会跳过迁移，方便在没有数据库的环境里只做编译检查。模型密钥不参与构建，不设置也能完整占卜。
 
 在 Vercel 项目的 Settings → Environment Variables 里，为 Production（以及需要登录记录的 Preview）设置：
 
@@ -84,7 +90,10 @@ Prisma 已经使用 PostgreSQL。不要改构建命令：Vercel 的 Next.js 默�
 | `DATABASE_URL` | Postgres **直连**字符串，不要用带 `-pooler` 的地址。Neon：在连接串面板关掉 Pooled connection，原样复制（含 `sslmode=require`）。Vercel Postgres：把集成提供的 `POSTGRES_URL_NON_POOLING` 填进 `DATABASE_URL`。如果集成已经写了一个池化的 `DATABASE_URL`，用直连字符串覆盖它。构建阶段要跑迁移，事务池化会让 `prisma migrate deploy` 失败。 |
 | `AUTH_SECRET` | 长随机字符串，例如 `openssl rand -base64 32` 的输出。 |
 | `NEXT_PUBLIC_SITE_URL` | 站点公开地址，无路径、无结尾斜杠，例如 `https://daodao-tarot.vercel.app`。 |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | 可选。不填则翻牌后直接显示内置牌义。也可以用 `GEMINI_API_KEY`。 |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | 可选。不填 ZenMux 时使用。也可以用 `GEMINI_API_KEY`。不填任何模型密钥则翻牌后直接显示内置牌义。 |
+| `ZENMUX_API_KEY` | 可选。设置后优先使用 ZenMux。 |
+| `ZENMUX_MODEL` | 可选。默认 `anthropic/claude-haiku-5.5`。 |
+| `AI_PROVIDER` | 可选。`gemini` 或 `zenmux`，两边都有密钥时用来指定。 |
 
 然后：
 
@@ -97,7 +106,7 @@ Prisma 已经使用 PostgreSQL。不要改构建命令：Vercel 的 Next.js 默�
 
 ## Deploy to Vercel
 
-Prisma is already on PostgreSQL. Leave the Vercel build command at the Next.js default, `npm run build`. That script runs `prisma generate`, then `prisma migrate deploy` when `DATABASE_URL` is set, then `next build`. If `DATABASE_URL` is absent, migrations are skipped. A Gemini key is not required to build or to use the app.
+Prisma is already on PostgreSQL. Leave the Vercel build command at the Next.js default, `npm run build`. That script runs `prisma generate`, then `prisma migrate deploy` when `DATABASE_URL` is set, then `next build`. If `DATABASE_URL` is absent, migrations are skipped. A model key is not required to build or to use the app.
 
 In the Vercel project, under Settings → Environment Variables, set these for Production (and for any Preview where signed-in history should work):
 
@@ -106,7 +115,10 @@ In the Vercel project, under Settings → Environment Variables, set these for P
 | `DATABASE_URL` | The **direct** Postgres URL, not the host that contains `-pooler`. On Neon, turn off Pooled connection and copy the string as shown, including `sslmode=require`. On Vercel Postgres, copy `POSTGRES_URL_NON_POOLING` into `DATABASE_URL`. If the integration already created a pooled `DATABASE_URL`, replace it with the direct string. Migrations run during the build, and a transaction pooler makes `prisma migrate deploy` fail. |
 | `AUTH_SECRET` | A long random string, for example the output of `openssl rand -base64 32`. |
 | `NEXT_PUBLIC_SITE_URL` | The public origin, with no path and no trailing slash, for example `https://daodao-tarot.vercel.app`. |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Optional. Omit it and a revealed spread shows the built-in reading. `GEMINI_API_KEY` is accepted as an alias. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Optional. Used when ZenMux is not configured. `GEMINI_API_KEY` is accepted as an alias. Omit every model key and a revealed spread shows the built-in reading. |
+| `ZENMUX_API_KEY` | Optional. When set, readings prefer ZenMux. |
+| `ZENMUX_MODEL` | Optional. Defaults to `anthropic/claude-haiku-5.5`. |
+| `AI_PROVIDER` | Optional. `gemini` or `zenmux`, used when both keys are set. |
 
 Then:
 
@@ -144,13 +156,13 @@ The 78 images in `public/cards/` come from the Wikimedia Commons category [Rider
 ## 限制
 
 - 生产环境使用 Postgres 直连字符串作为 `DATABASE_URL`。无服务器函数各自建连接，流量很大时再考虑连接池。
-- 解牌走 Google Gemini，依据知识库，并使用你自己的 API 额度。同一 IP 每小时大约 30 次；超出、失败或没有密钥时，改为显示内置牌义。
+- 解牌走 ZenMux 或 Google Gemini，依据知识库，并使用你自己的 API 额度。同一 IP 每小时大约 30 次；超出、失败、额度用尽或没有密钥时，改为显示内置牌义。
 - 牌义是简短的现代解读，不是某一本书的全文。
 - 没有第三方登录，也没有密码重置邮件。
 
 ## Limitations
 
 - Production expects a direct Postgres URL in `DATABASE_URL`. Each serverless instance opens its own connections; add a pooler only after you actually hit connection limits.
-- The reading is written by Google Gemini from the knowledge base and spends your own API quota. Each IP is limited to about 30 requests an hour. Past that limit, on failure, or with no key, the built-in reading is shown instead.
+- The reading is written by ZenMux or Google Gemini from the knowledge base and spends your own API quota. Each IP is limited to about 30 requests an hour. Past that limit, on failure, on a 429, or with no key, the built-in reading is shown instead.
 - Meanings are short modern readings, not the full text of a printed book.
 - There is no social login and no password-reset email.
