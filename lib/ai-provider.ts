@@ -2,12 +2,15 @@ import { parseAiReading } from "./ai-reading";
 import type { Locale } from "./cards";
 import {
   DEFAULT_GEMINI_MODEL,
+  EMPTY_USAGE,
   GEMINI_TIMEOUT_MS,
+  addUsage,
   isGeminiTimeout,
   readingResponseSchema,
   requestGeminiInterpretation,
   type GeminiFailure,
   type GeminiSuccess,
+  type TokenUsage,
 } from "./gemini";
 import { repairReading } from "./prompt/checks";
 import { selfReviewPrompt, type SelfReviewContext } from "./prompt/compose";
@@ -139,6 +142,8 @@ export async function requestAiInterpretation(input: {
   selfReview?: boolean;
   locale?: Locale;
   reviewContext?: SelfReviewContext;
+  skipModels?: string[];
+  onQuota?: (model: string) => Promise<void> | void;
 }): Promise<AiResult> {
   if (input.provider.id === "gemini") {
     return requestGeminiInterpretation({
@@ -153,6 +158,8 @@ export async function requestAiInterpretation(input: {
       selfReview: input.selfReview,
       locale: input.locale,
       reviewContext: input.reviewContext,
+      skipModels: input.skipModels,
+      onQuota: input.onQuota,
     });
   }
   return requestZenmuxInterpretation(input);
@@ -173,12 +180,19 @@ export async function requestZenmuxInterpretation(input: {
   const fetchImpl = input.fetchImpl ?? fetch;
   const signal = AbortSignal.timeout(timeoutMs);
   let format: ChatFormat = "json_schema";
+  let usage: TokenUsage = EMPTY_USAGE;
+  const withMeta = (reading: GeminiSuccess["reading"]): GeminiSuccess => ({
+    reading,
+    model: input.provider.model,
+    modelsTried: [input.provider.model],
+    usage,
+  });
 
   const complete = async (
     system: string,
     user: unknown,
     nextFormat: ChatFormat,
-  ): Promise<AiResult | "schema-rejected"> => {
+  ): Promise<{ reading: GeminiSuccess["reading"] } | GeminiFailure | "schema-rejected"> => {
     try {
       const response = await fetchImpl(ZENMUX_CHAT_URL, {
         method: "POST",
@@ -203,6 +217,7 @@ export async function requestZenmuxInterpretation(input: {
         return { error: "AI_FAILED", reason: "upstream" };
       }
       const payload = (await response.json()) as unknown;
+      usage = addUsage(usage, usageFromChat(payload));
       const text = chatCompletionText(payload);
       const reading = text ? parseAiReading(text, input.positions) : null;
       if (!reading) return { error: "AI_FAILED", reason: "empty" };
@@ -212,7 +227,7 @@ export async function requestZenmuxInterpretation(input: {
     }
   };
 
-  const once = async (system: string, user: unknown): Promise<AiResult> => {
+  const once = async (system: string, user: unknown): Promise<{ reading: GeminiSuccess["reading"] } | GeminiFailure> => {
     const first = await complete(system, user, format);
     if (first !== "schema-rejected") return first;
     if (signal.aborted) return { error: "AI_FAILED", reason: "timeout" };
@@ -230,10 +245,22 @@ export async function requestZenmuxInterpretation(input: {
     if (!("reading" in revised)) return null;
     return revised.reading;
   });
-  const first = { reading: repaired };
-  if (!input.selfReview || signal.aborted || !input.reviewContext) return first;
-  const review = selfReviewPrompt(first.reading, input.locale ?? "zh", input.reviewContext);
+  const delivered = withMeta(repaired);
+  if (!input.selfReview || signal.aborted || !input.reviewContext) return delivered;
+  const review = selfReviewPrompt(repaired, input.locale ?? "zh", input.reviewContext);
   const revised = await once(review.system, review.user);
-  if ("reading" in revised) return revised;
-  return first;
+  if ("reading" in revised) return withMeta(revised.reading);
+  return delivered;
+}
+
+function usageFromChat(payload: unknown): TokenUsage {
+  if (!payload || typeof payload !== "object" || !("usage" in payload)) return EMPTY_USAGE;
+  const raw = (payload as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }).usage;
+  const inputTokens = raw?.prompt_tokens ?? 0;
+  const outputTokens = raw?.completion_tokens ?? 0;
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: raw?.total_tokens ?? inputTokens + outputTokens,
+  };
 }

@@ -133,14 +133,13 @@ describe("ai provider", () => {
         return Response.json(chat("```json\n" + readingJson() + "\n```"));
       },
     });
-    assert.deepEqual(result, {
-      reading: {
-        overview: "第一眼。",
-        cards: [{ positionId: "past", body: "过去这一张。" }],
-        connection: "连在一起。",
-        conclusion: "先做一件小事。",
-      },
-    });
+    assert.ok("reading" in result);
+    if ("reading" in result) {
+      assert.equal(result.reading.overview, "第一眼。");
+      assert.equal(result.reading.conclusion, "先做一件小事。");
+      assert.equal(result.model, DEFAULT_ZENMUX_MODEL);
+      assert.deepEqual(result.modelsTried, [DEFAULT_ZENMUX_MODEL]);
+    }
     assert.equal(JSON.stringify(result).includes("zenmux-test-key"), false);
   });
 

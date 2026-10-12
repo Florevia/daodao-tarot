@@ -1,4 +1,5 @@
 import { hashPassword, setSessionCookie, signSession } from "@/lib/auth";
+import { clientIp, consumeAuthAttempt, prismaCounterStore } from "@/lib/limits";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -18,6 +19,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
   const email = parsed.data.email.toLowerCase();
+  const allowed = await consumeAuthAttempt(prismaCounterStore(), "register", clientIp(request), email).catch(() => false);
+  if (!allowed) return Response.json({ error: "RATE_LIMIT" }, { status: 429 });
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return Response.json({ error: "EMAIL_TAKEN" }, { status: 409 });

@@ -36,7 +36,28 @@ export type GeminiFailReason = "timeout" | "upstream" | "empty" | "quota";
 
 export type GeminiFailure = { error: "AI_FAILED"; reason: GeminiFailReason };
 
-export type GeminiSuccess = { reading: AiReading };
+export type TokenUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+};
+
+export const EMPTY_USAGE: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+export function addUsage(left: TokenUsage, right: TokenUsage): TokenUsage {
+  return {
+    inputTokens: left.inputTokens + right.inputTokens,
+    outputTokens: left.outputTokens + right.outputTokens,
+    totalTokens: left.totalTokens + right.totalTokens,
+  };
+}
+
+export type GeminiSuccess = {
+  reading: AiReading;
+  model: string;
+  modelsTried: string[];
+  usage: TokenUsage;
+};
 
 type GeminiPart = {
   text?: unknown;
@@ -46,7 +67,19 @@ type GeminiPart = {
 
 type GeminiPayload = {
   candidates?: { content?: { parts?: GeminiPart[] } }[];
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
 };
+
+export function usageFromGemini(payload: GeminiPayload): TokenUsage {
+  const inputTokens = payload.usageMetadata?.promptTokenCount ?? 0;
+  const outputTokens = payload.usageMetadata?.candidatesTokenCount ?? 0;
+  const totalTokens = payload.usageMetadata?.totalTokenCount ?? inputTokens + outputTokens;
+  return { inputTokens, outputTokens, totalTokens };
+}
 
 export function geminiApiKey(): string {
   return (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY || "").trim();
@@ -261,14 +294,19 @@ export async function requestGeminiInterpretation(input: {
   selfReview?: boolean;
   locale?: Locale;
   reviewContext?: SelfReviewContext;
+  skipModels?: string[];
+  onQuota?: (model: string) => Promise<void> | void;
 }): Promise<GeminiSuccess | GeminiFailure> {
   const timeoutMs = input.timeoutMs ?? GEMINI_TIMEOUT_MS;
   const fetchImpl = input.fetchImpl ?? fetch;
   const signal = AbortSignal.timeout(timeoutMs);
-  const chain = geminiModelChain(input.model);
+  const skipped = new Set(input.skipModels ?? []);
+  const chain = geminiModelChain(input.model).filter((model) => !skipped.has(model));
   const schema = input.schema ?? readingResponseSchema;
+  const modelsTried: string[] = [];
+  let usage = EMPTY_USAGE;
 
-  const once = async (model: string, system: string, user: unknown): Promise<GeminiSuccess | GeminiFailure | "unavailable"> => {
+  const once = async (model: string, system: string, user: unknown): Promise<{ reading: AiReading } | GeminiFailure | "unavailable"> => {
     try {
       const response = await fetchImpl(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -284,6 +322,7 @@ export async function requestGeminiInterpretation(input: {
       );
       if (response.status === 429) {
         await response.body?.cancel().catch(() => undefined);
+        await input.onQuota?.(model);
         return { error: "AI_FAILED", reason: "quota" };
       }
       if (!response.ok) {
@@ -293,6 +332,7 @@ export async function requestGeminiInterpretation(input: {
         return { error: "AI_FAILED", reason: "upstream" };
       }
       const payload = (await response.json()) as GeminiPayload;
+      usage = addUsage(usage, usageFromGemini(payload));
       const text = candidateText(payload.candidates?.[0]?.content?.parts);
       const reading = text ? parseAiReading(text, input.positions) : null;
       if (!reading) return { error: "AI_FAILED", reason: "empty" };
@@ -302,13 +342,16 @@ export async function requestGeminiInterpretation(input: {
     }
   };
 
-  let first: GeminiSuccess | null = null;
+  if (chain.length === 0) return { error: "AI_FAILED", reason: "quota" };
+
+  let first: { reading: AiReading } | null = null;
   let usedModel = input.model;
   let sawQuota = false;
   let lastFailure: GeminiFailReason | null = null;
   const seenFailures = new Set<GeminiFailReason>();
   for (const model of chain) {
     if (signal.aborted) return { error: "AI_FAILED", reason: "timeout" };
+    modelsTried.push(model);
     const result = await once(model, input.system, input.user);
     if (result === "unavailable") continue;
     if ("error" in result) {
@@ -337,10 +380,10 @@ export async function requestGeminiInterpretation(input: {
     if (typeof revised !== "object" || !("reading" in revised)) return null;
     return revised.reading;
   });
-  first = { reading: repaired };
-  if (!input.selfReview || signal.aborted || !input.reviewContext) return first;
-  const review = selfReviewPrompt(first.reading, input.locale ?? "zh", input.reviewContext);
+  const delivered = (): GeminiSuccess => ({ reading: repaired, model: usedModel, modelsTried, usage });
+  if (!input.selfReview || signal.aborted || !input.reviewContext) return delivered();
+  const review = selfReviewPrompt(repaired, input.locale ?? "zh", input.reviewContext);
   const revised = await once(usedModel, review.system, review.user);
-  if (revised !== "unavailable" && "reading" in revised) return revised;
-  return first;
+  if (typeof revised === "object" && "reading" in revised) return { reading: revised.reading, model: usedModel, modelsTried, usage };
+  return delivered();
 }

@@ -54,9 +54,7 @@ export async function clearSessionCookie(): Promise<void> {
   store.delete(SESSION_COOKIE);
 }
 
-export async function readSession(): Promise<PublicUser | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+export async function readSessionFromToken(token: string | undefined): Promise<PublicUser | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, authSecret());
@@ -69,6 +67,11 @@ export async function readSession(): Promise<PublicUser | null> {
   } catch {
     return null;
   }
+}
+
+export async function readSession(): Promise<PublicUser | null> {
+  const store = await cookies();
+  return readSessionFromToken(store.get(SESSION_COOKIE)?.value);
 }
 
 export async function verifyAgainstDummy(password: string): Promise<void> {

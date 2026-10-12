@@ -28,11 +28,25 @@ export const notablePairs: ReadonlyArray<readonly [string, string]> = [
   ["cups-10", "pentacles-10"],
 ];
 
+/**
+ * Self-harm language only. “想死你了” is missing someone, and “跳楼价” is a sale.
+ * “don't want to die” is not a crisis either.
+ */
+export function isCrisisQuestion(question: string): boolean {
+  const text = question.trim();
+  if (!text) return false;
+  if (/自杀|自残|不想活|活不下去|结束生命|割腕|伤害自己|轻生|死了算了|活着没意思|不想醒来/.test(text)) return true;
+  if (/想死(?!你)/.test(text)) return true;
+  if (/跳楼(?!价)/.test(text)) return true;
+  if (/kill(?:ing)? myself|suicide|self-harm|hurt myself/i.test(text)) return true;
+  if (/end(?:ing)? my life/i.test(text)) return true;
+  if (/(?<!don'?t )(?<!not )want to die/i.test(text)) return true;
+  return false;
+}
+
 export function detectQuestionKind(question: string): QuestionKind | null {
   const text = question.trim();
-  if (/自杀|自残|不想活|活不下去|结束生命|割腕|伤害自己|kill myself|suicide|self-harm|hurt myself/i.test(text)) {
-    return "crisis";
-  }
+  if (isCrisisQuestion(text)) return "crisis";
   if (/第三者|小三|出轨|外面还有|外面有人|另一个人|someone else|third person|affair/i.test(text)) return "third-party";
   if (/复合|还会回来|会回来|还会联系|想回来|回头找|come back|will he return|will they return/i.test(text)) {
     return "will-they-return";
